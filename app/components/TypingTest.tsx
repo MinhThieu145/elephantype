@@ -54,19 +54,6 @@ export default function TypingTest() {
     if (userInput.length === 1 && !startTime) {
       setStartTime(Date.now());
       setIsActive(true);
-      
-      // Start countdown timer
-      timerRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            // Time's up
-            clearInterval(timerRef.current as NodeJS.Timeout);
-            finishTest('completed');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
     }
   }, [userInput, startTime]);
 
@@ -75,6 +62,7 @@ export default function TypingTest() {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, []);
@@ -108,10 +96,13 @@ export default function TypingTest() {
     // Stop the timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
+      timerRef.current = null;
     }
     
+    // Update state to show test is complete
     setIsActive(false);
     setTestComplete(true);
+    setTimeRemaining(0); // Ensure timer shows 0 when complete
     
     // Complete the session and capture final data
     completeSession(userInput, status);
@@ -151,26 +142,48 @@ export default function TypingTest() {
       return;
     }
     
+    // Don't allow typing if test is complete
+    if (testComplete) {
+      return;
+    }
+    
+    // Capture normal typing keys for data analysis
+    if (e.key.length === 1 || e.key === 'Backspace') {
+      // Get expected key at current position
+      const expectedKey = e.key.length === 1 
+        ? (currentPosition < text.length ? text[currentPosition] : null) 
+        : null;
+      
+      // Record the keystroke with correct expected value
+      captureKeystroke(
+        e.key,
+        expectedKey,
+        currentPosition,
+        'keydown'
+      );
+    }
+    
     // Allow normal input
     if (!isActive && e.key.length === 1) {
       setStartTime(Date.now());
       setIsActive(true);
+      
+      // Start countdown timer immediately when typing begins
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            // Time's up
+            clearInterval(timerRef.current as NodeJS.Timeout);
+            finishTest('completed');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
     
     if (e.key.length === 1 || e.key === 'Backspace') {
       handleInput(e);
-      
-      // Capture keystroke data for data analysis
-      const expectedKey = e.key.length === 1 
-        ? text[currentPosition] 
-        : null;
-        
-      captureKeystroke(
-        e.key, 
-        expectedKey, 
-        currentPosition, 
-        'keydown'
-      );
     }
   };
 
@@ -291,8 +304,8 @@ export default function TypingTest() {
             border: '1px solid var(--card-border)'
           }}
         >
-          <span className={timeRemaining <= 10 ? 'text-incorrect-char' : ''}>
-            {formatTime(timeRemaining)}
+          <span className={timeRemaining <= 10 ? 'text-incorrect-char' : ''} style={{ fontWeight: timeRemaining === 0 ? 'bold' : 'normal' }}>
+            {timeRemaining === 0 ? 'Time\'s up!' : formatTime(timeRemaining)}
           </span>
         </div>
         <div 
