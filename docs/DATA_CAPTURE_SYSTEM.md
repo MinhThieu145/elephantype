@@ -83,6 +83,18 @@ The process works as follows:
 4. The system calculates performance metrics based on the collected data
 5. The data is saved to localStorage and can be exported as JSON for further analysis
 
+### Keystroke Capture Timing
+
+The timing of keystroke capture is critical for accurate data collection:
+
+1. Keystrokes are captured BEFORE processing the input change to ensure the current position is correct
+2. For each keystroke, we determine the expected key based on the text prompt and current position
+3. A bounds check ensures we don't try to access characters beyond the text prompt length
+4. The system records whether each keystroke was correct by comparing the actual key with the expected key
+5. Inter-key delays are calculated based on timestamps of consecutive keystrokes
+
+This approach ensures that all keystrokes are accurately captured and correctly analyzed, leading to reliable performance metrics.
+
 ## Privacy Considerations
 
 The data capture system stores all data locally in the user's browser using localStorage. No data is transmitted to any server unless the user explicitly exports and shares it. Users can delete their data at any time by clearing their browser's localStorage.
@@ -120,4 +132,30 @@ For more technical details, refer to the code documentation in the relevant file
 - `app/lib/types.ts`
 - `app/lib/dataCapture.ts`
 - `app/lib/useTypingData.ts`
-- `app/components/TypingStats.tsx` 
+- `app/components/TypingStats.tsx`
+
+## Common Issues and Troubleshooting
+
+### Zero or Incorrect Statistics
+
+If typing statistics show all zeros or significantly incorrect values, check for these issues:
+
+1. **Keystroke Capture Timing**: Ensure keystrokes are captured BEFORE processing the input change
+2. **Expected Key Determination**: Verify the bounds checking when determining expected keys
+3. **Filtering Logic**: Check that the keystroke filtering in `calculateMetrics` matches the `actionType` you're using for capture
+
+### Inconsistent Timer Behavior
+
+If the timer doesn't start properly or behaves erratically:
+
+1. **Timer Initialization**: Ensure the timer is initialized at the first keystroke
+2. **Timer Cleanup**: Make sure timers are properly cleared when the test is complete or reset
+3. **State Updates**: Verify that timer state updates are handled correctly in all scenarios
+
+### Data Not Persisting
+
+If session data doesn't persist between page refreshes:
+
+1. **localStorage Access**: Check that localStorage is available and not throwing errors
+2. **JSON Serialization**: Ensure all data can be properly serialized to JSON
+3. **Session IDs**: Verify that unique session IDs are being generated properly 

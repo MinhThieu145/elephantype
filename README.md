@@ -12,6 +12,8 @@ A minimalistic typing test application similar to [MonkeyType](https://monkeytyp
 - **Comprehensive Data Capture**: Detailed tracking of typing patterns, errors, and performance metrics
 - **Statistical Analysis**: View and analyze your typing performance with interactive statistics
 - **Data Export**: Download your typing data in JSON format for external analysis
+- **Timed Tests**: 1-minute typing test with automatic completion
+- **Word Count Tracking**: Monitor progress through the text with word count display
 
 ## Tech Stack
 
@@ -79,6 +81,7 @@ The application includes a comprehensive data capture system that records detail
 
 ### Key Features of the Data Capture System
 
+- **Accurate Keystroke Tracking**: Properly captures and analyzes every keystroke with precise timing
 - **Raw Keystroke Data**: Records timestamp, key value, correctness, and position for each keystroke
 - **Session Metadata**: Captures information about the overall typing session
 - **Environmental Context**: Collects data about the device, browser, and input method

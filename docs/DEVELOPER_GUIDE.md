@@ -147,6 +147,23 @@ When extending the data capture system:
 5. **Follow Component Structure**: Keep the modular architecture intact to make future extensions easier
 6. **Write Tests**: Add tests for new functionality to ensure it works correctly
 
+### Keystroke Capture Best Practices
+
+When working with keystroke capture, follow these critical guidelines:
+
+1. **Capture Before Processing**: Always capture keystrokes BEFORE processing input changes to ensure position data is accurate
+2. **Bounds Checking**: Always check array bounds when accessing text characters:
+   ```typescript
+   const expectedKey = currentPosition < text.length ? text[currentPosition] : null;
+   ```
+3. **Proper Action Type Matching**: Ensure the keystroke filtering in metrics calculation matches the action type used for capture:
+   ```typescript
+   // If capturing with 'keydown', filter with the same type
+   const typingKeystrokes = keystrokes.filter(k => k.actionType === 'keydown' && k.key.length === 1);
+   ```
+4. **Timing Consistency**: Handle timing state (like timestamps and intervals) carefully to avoid inconsistencies
+5. **Filter Properly**: Only count meaningful keystrokes (typically single characters) in your metrics calculations
+
 ## Troubleshooting
 
 Common issues when extending the system:
@@ -170,6 +187,30 @@ If calculated metrics don't match expected values:
 - Check the calculation logic in `calculateMetrics`
 - Verify that raw data is being captured correctly
 - Add logging to debug the data flow
+
+### Common Implementation Pitfalls
+
+Here are common pitfalls to avoid:
+
+1. **Keystroke Capture Timing**:
+   - ❌ Capturing keystrokes AFTER updating current position
+   - ✅ Capture keystrokes BEFORE any state updates
+
+2. **Expected Key Determination**:
+   - ❌ Accessing text without bounds checking: `text[currentPosition]`
+   - ✅ Using bounds checking: `currentPosition < text.length ? text[currentPosition] : null`
+
+3. **Timer Management**:
+   - ❌ Not properly cleaning up timers when component unmounts or test resets
+   - ✅ Clearing intervals and nullifying refs: `clearInterval(timerRef.current); timerRef.current = null;`
+
+4. **State Updates**:
+   - ❌ Directly modifying state objects or arrays
+   - ✅ Using proper immutable updates with state setters
+
+5. **Dependency Arrays**:
+   - ❌ Missing dependencies in useEffect or useCallback hooks
+   - ✅ Including all used variables in dependency arrays
 
 ## Example Extensions
 
