@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { TypingSessionData } from '../lib/types';
+import FoundryIntegration from './FoundryIntegration';
 
 interface TypingStatsProps {
   sessionData: TypingSessionData | null;
@@ -250,6 +251,13 @@ export default function TypingStats({ sessionData }: TypingStatsProps) {
             >
               Download JSON
             </button>
+          </div>
+          
+          {/* Palantir Foundry Integration */}
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-medium mb-2">Palantir Foundry Integration</h3>
+            <p className="text-sm mb-4">Send this typing session data to Palantir Foundry for analysis.</p>
+            <FoundryIntegration sessionData={sessionData} />
           </div>
         </div>
       )}
