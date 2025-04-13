@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useTypingData } from '../lib/useTypingData';
+import TypingStats from './TypingStats';
 
 // Sample text prompts - in a real app, you might fetch these from an API
 const sampleTexts = [
@@ -20,6 +22,13 @@ export default function TypingTest() {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [errors, setErrors] = useState(0);
   const [testComplete, setTestComplete] = useState(false);
+  
+  // Integrate data capture system
+  const { 
+    captureKeystroke, 
+    completeSession, 
+    sessionData 
+  } = useTypingData(text);
   
   const inputRef = useRef<HTMLDivElement>(null);
 
@@ -59,9 +68,12 @@ export default function TypingTest() {
       if (currentPosition >= text.length) {
         setIsActive(false);
         setTestComplete(true);
+        
+        // Complete the session and capture final data
+        completeSession(userInput, 'completed');
       }
     }
-  }, [userInput, startTime, isActive, currentPosition, text]);
+  }, [userInput, startTime, isActive, currentPosition, text, completeSession]);
 
   const calculateErrors = () => {
     let errorCount = 0;
@@ -105,6 +117,18 @@ export default function TypingTest() {
     
     if (e.key.length === 1 || e.key === 'Backspace') {
       handleInput(e);
+      
+      // Capture keystroke data for data analysis
+      const expectedKey = e.key.length === 1 
+        ? text[currentPosition] 
+        : null;
+        
+      captureKeystroke(
+        e.key, 
+        expectedKey, 
+        currentPosition, 
+        'keydown'
+      );
     }
   };
 
@@ -122,6 +146,11 @@ export default function TypingTest() {
   };
 
   const resetTest = () => {
+    // If test is active or complete, mark as abandoned
+    if (isActive || testComplete) {
+      completeSession(userInput, 'abandoned');
+    }
+    
     const randomIndex = Math.floor(Math.random() * sampleTexts.length);
     setText(sampleTexts[randomIndex]);
     setUserInput('');
@@ -236,6 +265,11 @@ export default function TypingTest() {
           Reset Test
         </button>
       </div>
+      
+      {/* Display typing statistics if session is complete */}
+      {testComplete && sessionData && (
+        <TypingStats sessionData={sessionData} />
+      )}
     </div>
   );
 } 

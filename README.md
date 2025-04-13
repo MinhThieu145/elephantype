@@ -9,12 +9,16 @@ A minimalistic typing test application similar to [MonkeyType](https://monkeytyp
 - **Performance Metrics**: Track your WPM (Words Per Minute), accuracy, and error count
 - **Responsive Design**: Works seamlessly on both desktop and mobile devices
 - **Light/Dark Mode**: Switch between light and dark themes based on your preference
+- **Comprehensive Data Capture**: Detailed tracking of typing patterns, errors, and performance metrics
+- **Statistical Analysis**: View and analyze your typing performance with interactive statistics
+- **Data Export**: Download your typing data in JSON format for external analysis
 
 ## Tech Stack
 
 - [Next.js](https://nextjs.org/) - React framework
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [UUID](https://github.com/uuidjs/uuid) - Unique ID generation for data capture
 
 ## Getting Started
 
@@ -51,9 +55,38 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
     - `Footer.tsx` - App footer with links
     - `TypingTest.tsx` - Main typing test component
     - `ThemeToggle.tsx` - Theme switcher component
+    - `TypingStats.tsx` - Component for displaying typing statistics
+  - `lib/` - Utility functions and types
+    - `types.ts` - TypeScript type definitions for data capture
+    - `dataCapture.ts` - Functions for capturing and processing typing data
+    - `useTypingData.ts` - React hook for integrating data capture
   - `globals.css` - Global styles and CSS variables
   - `layout.tsx` - Root layout component
   - `page.tsx` - Main page component
+- `docs/` - Documentation for the project
+  - `DATA_CAPTURE_SYSTEM.md` - Overview of the data capture system
+  - `DATA_POINTS_REFERENCE.md` - Detailed reference of captured data points
+  - `DEVELOPER_GUIDE.md` - Guide for extending the data capture system
+
+## Data Capture System
+
+The application includes a comprehensive data capture system that records detailed information about typing sessions. This data can be used to:
+
+- **Analyze Typing Performance**: Track WPM, accuracy, and error patterns
+- **Identify Problem Areas**: Detect which keys and character combinations cause the most errors
+- **Monitor Progress**: Compare results across multiple typing sessions
+- **Improve Typing Skills**: Use detailed feedback to focus practice on specific weaknesses
+
+### Key Features of the Data Capture System
+
+- **Raw Keystroke Data**: Records timestamp, key value, correctness, and position for each keystroke
+- **Session Metadata**: Captures information about the overall typing session
+- **Environmental Context**: Collects data about the device, browser, and input method
+- **Performance Metrics**: Calculates WPM, accuracy, error rate, and typing consistency
+- **Local Storage**: All data is stored locally in the browser
+- **Privacy-Focused**: No data is sent to any server unless explicitly exported by the user
+
+For more information about the data capture system, see the [documentation](/docs/DATA_CAPTURE_SYSTEM.md).
 
 ## Accessibility
 
