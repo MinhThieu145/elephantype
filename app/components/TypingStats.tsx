@@ -207,7 +207,28 @@ export default function TypingStats({ sessionData }: TypingStatsProps) {
             <pre>{JSON.stringify(sessionData, null, 2)}</pre>
           </div>
           
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end space-x-3">
+            <button
+              className="px-3 py-1 rounded-md text-sm font-medium"
+              style={{ 
+                backgroundColor: 'var(--secondary)',
+                color: 'var(--foreground)'
+              }}
+              onClick={() => {
+                // Copy the JSON to clipboard
+                navigator.clipboard.writeText(JSON.stringify(sessionData, null, 2))
+                  .then(() => {
+                    // Optional: Show feedback that it was copied
+                    alert('JSON copied to clipboard!');
+                  })
+                  .catch(err => {
+                    console.error('Failed to copy JSON:', err);
+                    alert('Failed to copy. Please try again.');
+                  });
+              }}
+            >
+              Copy JSON
+            </button>
             <button
               className="px-3 py-1 rounded-md text-sm font-medium"
               style={{ 
