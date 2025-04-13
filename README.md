@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MonkeyType Clone
+
+A minimalistic typing test application similar to [MonkeyType](https://monkeytype.com/), built with Next.js.
+
+## Features
+
+- **Clean, Distraction-Free Design**: Focused on the typing experience with minimal UI elements
+- **Real-Time Feedback**: Visual indicators for correct and incorrect keystrokes
+- **Performance Metrics**: Track your WPM (Words Per Minute), accuracy, and error count
+- **Responsive Design**: Works seamlessly on both desktop and mobile devices
+- **Light/Dark Mode**: Switch between light and dark themes based on your preference
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org/) - React framework
+- [TypeScript](https://www.typescriptlang.org/) - Type safety
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
 
 ## Getting Started
 
-First, run the development server:
+First, clone the repository:
+
+```bash
+git clone https://github.com/MinhThieu145/monkeytype.git
+cd monkeytype
+```
+
+Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+Run the development server:
 
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `app/` - Next.js application directory
+  - `components/` - Reusable UI components
+    - `Header.tsx` - App header with logo and theme toggle
+    - `Footer.tsx` - App footer with links
+    - `TypingTest.tsx` - Main typing test component
+    - `ThemeToggle.tsx` - Theme switcher component
+  - `globals.css` - Global styles and CSS variables
+  - `layout.tsx` - Root layout component
+  - `page.tsx` - Main page component
 
-## Learn More
+## Accessibility
 
-To learn more about Next.js, take a look at the following resources:
+The application is designed with accessibility in mind:
+- Proper contrast ratios for text readability
+- Keyboard navigability
+- Screen reader friendly elements with appropriate ARIA attributes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the MIT License.
