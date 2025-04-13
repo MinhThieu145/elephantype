@@ -12,6 +12,9 @@ const sampleTexts = [
   "The art of typing quickly and accurately is a valuable skill in the digital age. Regular practice can significantly improve your words per minute and reduce errors."
 ];
 
+// Time limit in seconds
+const TIME_LIMIT = 60;
+
 export default function TypingTest() {
   const [text, setText] = useState('');
   const [userInput, setUserInput] = useState('');
@@ -22,6 +25,8 @@ export default function TypingTest() {
   const [currentPosition, setCurrentPosition] = useState(0);
   const [errors, setErrors] = useState(0);
   const [testComplete, setTestComplete] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(TIME_LIMIT);
+  const [totalWords, setTotalWords] = useState(0);
   
   // Integrate data capture system
   const { 
@@ -31,11 +36,17 @@ export default function TypingTest() {
   } = useTypingData(text);
   
   const inputRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Select random text on component mount
   useEffect(() => {
     const randomIndex = Math.floor(Math.random() * sampleTexts.length);
-    setText(sampleTexts[randomIndex]);
+    const selectedText = sampleTexts[randomIndex];
+    setText(selectedText);
+    
+    // Calculate total words in the text
+    const words = selectedText.trim().split(/\s+/);
+    setTotalWords(words.length);
   }, []);
 
   // Start the timer when the user starts typing
@@ -43,8 +54,30 @@ export default function TypingTest() {
     if (userInput.length === 1 && !startTime) {
       setStartTime(Date.now());
       setIsActive(true);
+      
+      // Start countdown timer
+      timerRef.current = setInterval(() => {
+        setTimeRemaining(prev => {
+          if (prev <= 1) {
+            // Time's up
+            clearInterval(timerRef.current as NodeJS.Timeout);
+            finishTest('completed');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
   }, [userInput, startTime]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
 
   // Focus on the input field when the component mounts
   useEffect(() => {
@@ -66,14 +99,23 @@ export default function TypingTest() {
       
       // Check if test is complete
       if (currentPosition >= text.length) {
-        setIsActive(false);
-        setTestComplete(true);
-        
-        // Complete the session and capture final data
-        completeSession(userInput, 'completed');
+        finishTest('completed');
       }
     }
   }, [userInput, startTime, isActive, currentPosition, text, completeSession]);
+
+  const finishTest = (status: 'completed' | 'abandoned') => {
+    // Stop the timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
+    setIsActive(false);
+    setTestComplete(true);
+    
+    // Complete the session and capture final data
+    completeSession(userInput, status);
+  };
 
   const calculateErrors = () => {
     let errorCount = 0;
@@ -148,11 +190,22 @@ export default function TypingTest() {
   const resetTest = () => {
     // If test is active or complete, mark as abandoned
     if (isActive || testComplete) {
-      completeSession(userInput, 'abandoned');
+      finishTest('abandoned');
+    }
+    
+    // Clear the timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
     
     const randomIndex = Math.floor(Math.random() * sampleTexts.length);
-    setText(sampleTexts[randomIndex]);
+    const selectedText = sampleTexts[randomIndex];
+    setText(selectedText);
+    
+    // Calculate total words in the new text
+    const words = selectedText.trim().split(/\s+/);
+    setTotalWords(words.length);
+    
     setUserInput('');
     setStartTime(null);
     setWordCount(0);
@@ -161,6 +214,7 @@ export default function TypingTest() {
     setCurrentPosition(0);
     setErrors(0);
     setTestComplete(false);
+    setTimeRemaining(TIME_LIMIT);
     
     if (inputRef.current) {
       inputRef.current.focus();
@@ -203,6 +257,13 @@ export default function TypingTest() {
     });
   };
 
+  // Format time as mm:ss
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Stats Display */}
@@ -218,6 +279,30 @@ export default function TypingTest() {
         <div className="text-center">
           <p className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>{errors}</p>
           <p className="text-sm">Errors</p>
+        </div>
+      </div>
+      
+      {/* Timer and Word Count */}
+      <div className="mb-6 flex justify-between items-center">
+        <div 
+          className="px-4 py-2 rounded font-mono font-medium"
+          style={{ 
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--card-border)'
+          }}
+        >
+          <span className={timeRemaining <= 10 ? 'text-incorrect-char' : ''}>
+            {formatTime(timeRemaining)}
+          </span>
+        </div>
+        <div 
+          className="px-4 py-2 rounded font-mono font-medium"
+          style={{ 
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--card-border)'
+          }}
+        >
+          <span>{wordCount}/{totalWords} words</span>
         </div>
       </div>
       
@@ -246,7 +331,7 @@ export default function TypingTest() {
         aria-label="Typing input area"
       >
         {!isActive && !testComplete ? (
-          <p className="text-center text-sm opacity-70">Click here and start typing to begin the test</p>
+          <p className="text-center text-sm opacity-70">Click here and start typing to begin the test (1 minute timer)</p>
         ) : testComplete ? (
           <p className="text-center text-sm opacity-70">Test complete! Press ESC to restart</p>
         ) : null}
