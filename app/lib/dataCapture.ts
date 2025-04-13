@@ -185,7 +185,7 @@ export function calculateMetrics(
 ): TypingMetrics {
   // Filter to include only actual typing keystrokes (not control keys)
   const typingKeystrokes = keystrokes.filter(k => 
-    k.actionType === 'keypress' && k.key.length === 1);
+    k.actionType === 'keydown' && k.key.length === 1);
   
   // Calculate basic counts
   const totalKeystrokes = typingKeystrokes.length;
