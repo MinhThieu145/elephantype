@@ -91,6 +91,13 @@ The application includes a comprehensive data capture system that records detail
 
 For more information about the data capture system, see the [documentation](/docs/DATA_CAPTURE_SYSTEM.md).
 
+### Documentation
+
+For detailed information about the Foundry integration, see:
+- [Developer Guide](./docs/DEVELOPER_GUIDE.md)
+- [Data Capture System](./docs/DATA_CAPTURE_SYSTEM.md)
+- [Data Points Reference](./docs/DATA_POINTS_REFERENCE.md)
+
 ## Accessibility
 
 The application is designed with accessibility in mind:

@@ -14,14 +14,14 @@ The system captures three main categories of data:
 
 Each individual keystroke is recorded with the following information:
 
-- **ID**: A unique identifier for each keystroke
+- **ID**: A unique identifier for each keystroke (UUID format, e.g., "123e4567-e89b-12d3-a456-426614174001")
 - **Timestamp**: Precise time when the keystroke occurred (milliseconds since epoch)
-- **Key**: The character or control key that was pressed
-- **Expected Key**: The character that should have been typed at this position
-- **Is Correct**: Whether the keystroke matched the expected character
-- **Position**: The position in the text where this keystroke applies
-- **Action Type**: Type of keyboard event (keydown, keyup, or keypress)
-- **Inter-Key Delay**: Time elapsed since the previous keystroke (null for the first keystroke)
+- **Key**: The character or control key that was pressed (string)
+- **Expected Key**: The character that should have been typed at this position (string, or null if not applicable)
+- **Is Correct**: Boolean indicating whether the keystroke matched the expected character (true/false)
+- **Position**: The position in the text where this keystroke applies (0-indexed integer)
+- **Action Type**: Type of keyboard event (specifically 'keydown', 'keyup', or 'keypress')
+- **Inter-Key Delay**: Time elapsed since the previous keystroke in milliseconds (number, or null for the first keystroke)
 
 This raw keystroke data provides insights into typing rhythm, common errors, and problem keys.
 
@@ -29,13 +29,13 @@ This raw keystroke data provides insights into typing rhythm, common errors, and
 
 Overall information about the typing session:
 
-- **Session ID**: Unique identifier for the session
-- **Start Time**: When the session began
-- **End Time**: When the session ended (null if not completed)
-- **Text Prompt**: The original text the user was asked to type
-- **User Transcript**: The final text input by the user
-- **Completion Status**: Whether the test was completed, abandoned, or is still in progress
-- **Duration**: Total time spent on the typing test (in milliseconds)
+- **Session ID**: Unique identifier for the session (UUID format, e.g., "123e4567-e89b-12d3-a456-426614174000")
+- **Start Time**: When the session began (milliseconds since epoch)
+- **End Time**: When the session ended (milliseconds since epoch, or null if not completed)
+- **Text Prompt**: The original text the user was asked to type (string)
+- **User Transcript**: The final text input by the user (string)
+- **Completion Status**: Status of the session (specifically 'completed', 'abandoned', or 'in-progress')
+- **Duration**: Total time spent on the typing test (in milliseconds, or null if not completed)
 - **Device Info**: Environmental context (see below)
 
 This metadata provides context for the session and allows for comparison between different sessions.
@@ -44,12 +44,14 @@ This metadata provides context for the session and allows for comparison between
 
 Information about the user's device and environment:
 
-- **Device Type**: Desktop, mobile, or tablet
-- **Browser**: Name and version of the browser used
-- **Operating System**: OS name and version
-- **Screen Size**: Width and height of the screen in pixels
-- **Keyboard Layout**: QWERTY, AZERTY, Dvorak, etc. (when available)
-- **Input Method**: Physical keyboard or touch screen
+- **Device Type**: Type of device (specifically 'desktop', 'mobile', or 'tablet')
+- **Browser Name**: Name of the browser used (string)
+- **Browser Version**: Version of the browser (string)
+- **Operating System**: OS name and version (string)
+- **Screen Width**: Width of the screen in pixels (integer)
+- **Screen Height**: Height of the screen in pixels (integer)
+- **Keyboard Layout**: Keyboard layout used, e.g., 'QWERTY', 'AZERTY', 'Dvorak', etc. (string, when available)
+- **Input Method**: Method of input (specifically 'physical keyboard' or 'touch screen')
 
 This context helps understand how different devices and environments affect typing performance.
 
@@ -57,14 +59,14 @@ This context helps understand how different devices and environments affect typi
 
 Based on the raw data, the system calculates several performance metrics:
 
-- **Words Per Minute (WPM)**: Typing speed based on the standard definition of 5 characters = 1 word
-- **Accuracy**: Percentage of keystrokes that were correct
-- **Error Rate**: Errors per character typed
-- **Total Keystrokes**: Total number of keys pressed during the session
-- **Correct Keystrokes**: Number of keystrokes that matched the expected characters
-- **Error Keystrokes**: Number of keystrokes that did not match the expected characters
-- **Consistency**: Standard deviation of inter-key intervals (lower values indicate more consistent typing rhythm)
-- **Problem Keys**: Map of keys to error counts, showing which characters caused the most trouble
+- **Words Per Minute (WPM)**: Typing speed based on the standard definition of 5 characters = 1 word (number)
+- **Accuracy**: Percentage of keystrokes that were correct (number, 0-100)
+- **Error Rate**: Errors per character typed (decimal value between 0-1)
+- **Total Keystrokes**: Total number of keys pressed during the session (integer)
+- **Correct Keystrokes**: Number of keystrokes that matched the expected characters (integer)
+- **Error Keystrokes**: Number of keystrokes that did not match the expected characters (integer)
+- **Consistency**: Standard deviation of inter-key intervals (number, lower values indicate more consistent typing rhythm)
+- **Problem Keys**: Map of keys to error counts, showing which characters caused the most trouble (Record<string, number>)
 
 ## How Data is Captured
 
@@ -108,6 +110,8 @@ The captured data is displayed in the typing statistics panel after completing a
 - View a summary of their performance
 - Access detailed metrics and session information
 - Download the raw data as JSON for personal analysis
+- Copy the JSON data to clipboard with a single click
+- Send typing data to Palantir Foundry for advanced analytics
 
 ### For Developers
 
@@ -116,6 +120,40 @@ The data capture system is designed to be modular and extensible. Developers can
 - Add new metrics by extending the `calculateMetrics` function
 - Implement data visualization features using the captured data
 - Create features for tracking progress over time by comparing multiple sessions
+- Integrate with third-party analytics platforms through the API integration layer
+
+## Integration Capabilities
+
+### Palantir Foundry Integration
+
+The system includes built-in integration with Palantir Foundry for advanced data analytics:
+
+1. **How It Works**:
+   - Typing data is sent to Palantir Foundry through secure API calls
+   - Data follows the schema defined in `DATA_POINTS_REFERENCE.md`
+   - Preview mode allows validation without data ingestion
+   - Full integration enables detailed analysis in the Foundry platform
+
+2. **Features**:
+   - Preview validation to ensure data schema compliance
+   - Secure authentication using API tokens
+   - Error handling and user feedback
+   - Both UI integration and command-line testing tools
+
+3. **Configuration**:
+   - API token must be configured in environment variables
+   - Integration settings can be modified in `sendDataToFoundry.ts`
+   - Test scripts available for verifying connectivity
+
+### Other Integration Possibilities
+
+The capture system architecture supports additional integrations through its modular design:
+
+- **Database Storage**: Add persistence layer for long-term tracking
+- **Analytics Platforms**: Export to Google Analytics, Mixpanel, etc.
+- **Visualization Tools**: Integration with Tableau, PowerBI, etc.
+
+For information on creating new integrations, see the [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) document.
 
 ## Technical Implementation
 

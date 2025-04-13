@@ -251,6 +251,71 @@ export function compareSessionsOverTime(sessions: TypingSessionData[]): Progress
 }
 ```
 
+## Application Structure
+
+## Working with External Integrations
+
+### Palantir Foundry Integration
+
+The application includes built-in support for sending typing test data to Palantir Foundry for advanced analytics.
+
+#### Configuration
+
+1. **Environment Setup**:
+   - Create a `.env.local` file in the project root (not just `.env`)
+   - Add your Foundry API token: `AIP_DATASTREAM_TOKEN=your_token_here`
+   - For production, configure the token in your hosting environment
+   - Restart your Next.js server after making changes to environment variables
+
+2. **Key Files**:
+   - `app/lib/sendDataToFoundry.ts`: Client-side integration logic
+   - `app/api/foundry/route.ts`: Server API route for secure token handling
+   - `app/components/FoundryIntegration.tsx`: UI component 
+   - `scripts/testFoundryIntegration.ts`: Command-line testing tool
+
+#### How It Works
+
+1. **Client-Side Flow**:
+   - User clicks "Send to Foundry" button
+   - Client code calls the API route at `/api/foundry`
+   - UI shows success/failure feedback
+
+2. **Server-Side Flow**:
+   - API route accesses the token securely from environment variables
+   - Server forwards the typing data to the Palantir Foundry API
+   - Server returns the result to the client
+
+3. **Security Benefits**:
+   - Token is never exposed to the client
+   - All sensitive API calls happen server-side
+   - Preview mode allows testing without data ingestion
+
+#### Troubleshooting
+
+If you encounter issues with the Foundry integration:
+
+1. **Environment Variables**:
+   - Ensure the token is in `.env.local` (not just `.env`)
+   - Check that you've restarted the Next.js server after changes
+   - For debug info, visit `/api/foundry/debug` in development mode
+
+2. **API Permissions**:
+   - Verify your token has the correct permissions
+   - Check that the dataset ID is correct in the API endpoint
+
+3. **Data Format**:
+   - Ensure your data matches the expected Foundry schema
+   - Use preview mode to validate without sending
+
+### Creating New Integrations
+
+To add a new integration with another platform:
+
+1. Create a new module in `app/lib/` for the integration logic
+2. Implement API calls following the pattern in `sendDataToFoundry.ts`
+3. Add a UI component for user interaction if needed
+4. Update documentation to reflect the new capabilities
+
 ## Conclusion
 
 The typing test data capture system is designed to be easily extended to meet various needs. By following this guide, you can add new features, metrics, and visualizations while maintaining the system's architecture and performance.
