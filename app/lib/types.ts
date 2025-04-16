@@ -45,6 +45,8 @@ export interface SessionMetadata {
   completionStatus: 'completed' | 'abandoned' | 'in-progress'; // Status of the session
   duration: number | null;    // Total duration in milliseconds (null if not completed)
   deviceInfo: TypingEnvironment; // Environmental context
+  processingStatus?: 'pending' | 'processing' | 'processed' | 'failed'; // Status of data processing for Palantir Foundry
+  lastProcessedTimestamp?: number; // When the data was last processed
 }
 
 /**
@@ -68,4 +70,5 @@ export interface TypingMetrics {
   errorKeystrokes: number;    // Number of error keystrokes
   consistency: number;        // Standard deviation of inter-key intervals
   problemKeys: Record<string, number>; // Map of keys to error counts
+  inconsistentKeys?: Record<string, number>; // Map of keys to their delay standard deviation (inconsistency)
 } 
