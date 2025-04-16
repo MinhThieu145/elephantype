@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TypingSessionData } from '../../lib/types';
 
 // Palantir Foundry API endpoint
-const FOUNDRY_API_ENDPOINT = 'https://nathannguyen.usw-16.palantirfoundry.com/api/v2/highScale/streams/datasets/ri.foundry.main.dataset.9325624e-4042-47bb-bf45-102a41eebda4/streams/master/publishRecords';
+const FOUNDRY_API_ENDPOINT = 'https://nathannguyen.usw-16.palantirfoundry.com/api/v2/highScale/streams/datasets/ri.foundry.main.dataset.2c68d899-d736-4661-bc42-82acc742cc6e/streams/master/publishRecords';
 
 export async function POST(request: NextRequest) {
   console.log('API route called with preview:', new URL(request.url).searchParams.has('preview'));
