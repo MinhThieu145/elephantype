@@ -127,6 +127,49 @@ export function exportSessionDataAsCsv(sessionData: TypingSessionData): string {
 }
 ```
 
+### Converting Data for External Systems
+
+For external system integrations that require simplified data formats, the system provides a utility to convert structured data objects to JSON strings:
+
+1. The `stringifySessionData` function converts the three main data categories to JSON strings:
+   ```typescript
+   export function stringifySessionData(sessionData: TypingSessionData): {
+     metadata: string;
+     keystrokes: string;
+     metrics: string;
+   } {
+     return {
+       metadata: JSON.stringify(sessionData.metadata),
+       keystrokes: JSON.stringify(sessionData.keystrokes),
+       metrics: JSON.stringify(sessionData.metrics)
+     };
+   }
+   ```
+
+2. Use this function right before sending data to external systems:
+   ```typescript
+   // Original data for local processing
+   const typingSessionData = generateSessionData(sessionMetadata, keystrokes);
+   
+   // Display data locally, perform calculations, etc.
+   displaySessionStats(typingSessionData);
+   
+   // Right before sending to external system, convert to stringified format
+   const stringified = stringifySessionData(typingSessionData);
+   sendToExternalSystem(stringified);
+   ```
+
+3. To parse the stringified data back to its original format:
+   ```typescript
+   const parsedData = {
+     metadata: JSON.parse(stringified.metadata),
+     keystrokes: JSON.parse(stringified.keystrokes),
+     metrics: JSON.parse(stringified.metrics)
+   };
+   ```
+
+This approach maintains the structured format for local use while providing a simplified string format for external systems.
+
 ### Implementing Server-Side Storage
 
 To store data on a server instead of just localStorage:
@@ -277,18 +320,25 @@ The application includes built-in support for sending typing test data to Palant
 
 1. **Client-Side Flow**:
    - User clicks "Send to Foundry" button
+   - The typing data is converted to a stringified format using `stringifySessionData`
    - Client code calls the API route at `/api/foundry`
    - UI shows success/failure feedback
 
 2. **Server-Side Flow**:
    - API route accesses the token securely from environment variables
-   - Server forwards the typing data to the Palantir Foundry API
+   - Server forwards the stringified typing data to the Palantir Foundry API
    - Server returns the result to the client
 
 3. **Security Benefits**:
    - Token is never exposed to the client
    - All sensitive API calls happen server-side
    - Preview mode allows testing without data ingestion
+
+4. **Data Transformation**:
+   - Before sending, complex objects are converted to JSON strings
+   - The three main categories (`metadata`, `keystrokes`, `metrics`) are stringified
+   - This simplifies data handling in the Foundry system
+   - Original object structure is maintained for local use
 
 #### Troubleshooting
 

@@ -212,179 +212,287 @@ This JSON structure represents a complete typing session with all the data captu
 Below is the JSON schema that defines the structure of the typing session data:
 
 ```json
-{
-  "format": {
-    "type": "json_schema",
-    "name": "typing_session_data",
-    "schema": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "type": "object",
-          "properties": {
-            "sessionId": {
-              "type": "string",
-              "description": "Unique identifier for the session (UUID format)"
-            },
-            "startTime": {
-              "type": "number",
-              "description": "Session start time (milliseconds since epoch)"
-            },
-            "endTime": {
-              "type": ["number", "null"],
-              "description": "Session end time (null if not completed)"
-            },
-            "textPrompt": {
-              "type": "string",
-              "description": "The original text prompt"
-            },
-            "userTranscript": {
-              "type": "string",
-              "description": "The final text input by the user"
-            },
-            "completionStatus": {
-              "type": "string",
-              "enum": ["completed", "abandoned", "in-progress"],
-              "description": "Status of the session"
-            },
-            "duration": {
-              "type": ["number", "null"],
-              "description": "Total duration in milliseconds (null if not completed)"
-            },
-            "deviceInfo": {
-              "type": "object",
-              "properties": {
-                "deviceType": {
-                  "type": "string",
-                  "description": "Type of device ('desktop', 'mobile', 'tablet')"
-                },
-                "browserName": {
-                  "type": "string",
-                  "description": "Name of the browser used"
-                },
-                "browserVersion": {
-                  "type": "string",
-                  "description": "Version of the browser"
-                },
-                "operatingSystem": {
-                  "type": "string",
-                  "description": "OS name and version"
-                },
-                "screenWidth": {
-                  "type": "number",
-                  "description": "Screen width in pixels"
-                },
-                "screenHeight": {
-                  "type": "number",
-                  "description": "Screen height in pixels"
-                },
-                "keyboardLayout": {
-                  "type": "string",
-                  "description": "Keyboard layout (e.g., 'QWERTY')"
-                },
-                "inputMethod": {
-                  "type": "string",
-                  "description": "Method of input ('physical keyboard', 'touch screen')"
-                }
-              },
-              "required": ["deviceType", "browserName", "browserVersion", "operatingSystem", 
-                          "screenWidth", "screenHeight", "keyboardLayout", "inputMethod"]
-            }
-          },
-          "required": ["sessionId", "startTime", "textPrompt", "userTranscript", 
-                      "completionStatus", "deviceInfo"]
-        },
-        "keystrokes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Unique identifier for this keystroke (UUID format)"
-              },
-              "timestamp": {
-                "type": "number",
-                "description": "Milliseconds since epoch"
-              },
-              "key": {
-                "type": "string",
-                "description": "The character or key that was pressed"
-              },
-              "expectedKey": {
-                "type": ["string", "null"],
-                "description": "The expected character at this position"
-              },
-              "isCorrect": {
-                "type": "boolean",
-                "description": "Whether the keystroke matched the expected character"
-              },
-              "position": {
-                "type": "number",
-                "description": "Position in the text (0-indexed)"
-              },
-              "actionType": {
-                "type": "string",
-                "enum": ["keydown", "keyup", "keypress"],
-                "description": "Type of keyboard event"
-              },
-              "interKeyDelay": {
-                "type": ["number", "null"],
-                "description": "Time since the last keystroke in ms (null for first keystroke)"
-              }
-            },
-            "required": ["id", "timestamp", "key", "expectedKey", "isCorrect", 
-                        "position", "actionType", "interKeyDelay"]
-          }
-        },
-        "metrics": {
-          "type": "object",
-          "properties": {
-            "wpm": {
-              "type": "number",
-              "description": "Words per minute"
-            },
-            "accuracy": {
-              "type": "number",
-              "description": "Accuracy percentage (0-100)"
-            },
-            "errorRate": {
-              "type": "number",
-              "description": "Errors per character typed (decimal value between 0-1)"
-            },
-            "totalKeystrokes": {
-              "type": "number",
-              "description": "Total number of keystrokes"
-            },
-            "correctKeystrokes": {
-              "type": "number",
-              "description": "Number of correct keystrokes"
-            },
-            "errorKeystrokes": {
-              "type": "number",
-              "description": "Number of error keystrokes"
-            },
-            "consistency": {
-              "type": "number",
-              "description": "Standard deviation of inter-key intervals (ms)"
-            },
-            "problemKeys": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "number"
-              },
-              "description": "Map of keys to error counts"
-            }
-          },
-          "required": ["wpm", "accuracy", "errorRate", "totalKeystrokes", 
-                      "correctKeystrokes", "errorKeystrokes", "consistency", "problemKeys"]
-        }
+[
+  {
+    "name": "metadata",
+    "customMetadata": {},
+    "nullable": true,
+    "type": "STRUCT",
+    "subSchemas": [
+      {
+        "name": "sessionId",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "STRING"
       },
-      "required": ["metadata", "keystrokes", "metrics"]
-    },
-    "strict": true
+      {
+        "name": "startTime",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "LONG"
+      },
+      {
+        "name": "endTime",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "LONG"
+      },
+      {
+        "name": "textPrompt",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "STRING"
+      },
+      {
+        "name": "userTranscript",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "STRING"
+      },
+      {
+        "name": "completionStatus",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "STRING"
+      },
+      {
+        "name": "duration",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "LONG"
+      },
+      {
+        "name": "deviceInfo",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "STRUCT",
+        "subSchemas": [
+          {
+            "name": "deviceType",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "STRING"
+          },
+          {
+            "name": "browserName",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "STRING"
+          },
+          {
+            "name": "browserVersion",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "STRING"
+          },
+          {
+            "name": "operatingSystem",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "STRING"
+          },
+          {
+            "name": "screenWidth",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "INTEGER"
+          },
+          {
+            "name": "screenHeight",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "INTEGER"
+          },
+          {
+            "name": "keyboardLayout",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "STRING"
+          },
+          {
+            "name": "inputMethod",
+            "customMetadata": {},
+            "nullable": true,
+            "type": "STRING"
+          }
+        ]
+      },
+      {
+        "name": "processingStatus",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "STRING"
+      }
+    ]
+  },
+  {
+    "name": "keystrokes",
+    "customMetadata": {},
+    "nullable": true,
+    "type": "ARRAY",
+    "arraySubtype": {
+      "nullable": false,
+      "customMetadata": {},
+      "type": "STRUCT",
+      "subSchemas": [
+        {
+          "name": "id",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "STRING"
+        },
+        {
+          "name": "timestamp",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "LONG"
+        },
+        {
+          "name": "key",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "STRING"
+        },
+        {
+          "name": "expectedKey",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "STRING"
+        },
+        {
+          "name": "isCorrect",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "position",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "actionType",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "STRING"
+        },
+        {
+          "name": "interKeyDelay",
+          "customMetadata": {},
+          "nullable": true,
+          "type": "LONG"
+        }
+      ]
+    }
+  },
+  {
+    "name": "metrics",
+    "customMetadata": {},
+    "nullable": true,
+    "type": "STRUCT",
+    "subSchemas": [
+      {
+        "name": "wpm",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "FLOAT"
+      },
+      {
+        "name": "accuracy",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "FLOAT"
+      },
+      {
+        "name": "errorRate",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "FLOAT"
+      },
+      {
+        "name": "totalKeystrokes",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "INTEGER"
+      },
+      {
+        "name": "correctKeystrokes",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "INTEGER"
+      },
+      {
+        "name": "errorKeystrokes",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "INTEGER"
+      },
+      {
+        "name": "consistency",
+        "customMetadata": {},
+        "nullable": true,
+        "type": "FLOAT"
+      },
+      {
+        "name": "problemKeys",
+        "customMetadata": {},
+        "nullable": false,
+        "type": "MAP",
+        "mapKeyType": {
+          "nullable": false,
+          "customMetadata": {},
+          "type": "STRING"
+        },
+        "mapValueType": {
+          "nullable": false,
+          "customMetadata": {},
+          "type": "INTEGER"
+        }
+      }
+    ]
   }
-}
+]
 ```
 
 This schema defines the complete structure of a typing session data object, including all required fields and their data types. 
+
+## Stringified Data Format
+
+For integration with Palantir Foundry and other external systems, the data capture system now supports converting the main data categories to JSON strings. This format simplifies data transmission and storage while preserving all the original information.
+
+### Stringified Structure
+
+```typescript
+{
+  metadata: string;    // JSON string of the entire metadata object
+  keystrokes: string;  // JSON string of the entire keystrokes array
+  metrics: string;     // JSON string of the entire metrics object
+}
+```
+
+### Example Stringified Format
+
+```json
+{
+  "metadata": "{\"sessionId\":\"123e4567-e89b-12d3-a456-426614174000\",\"startTime\":1623456789000,...}",
+  "keystrokes": "[{\"id\":\"123e4567-e89b-12d3-a456-426614174001\",\"timestamp\":1623456789100,...}]",
+  "metrics": "{\"wpm\":45.6,\"accuracy\":77.78,\"errorRate\":0.22,...}"
+}
+```
+
+### Converting Between Formats
+
+The system provides utility functions to convert between the structured and stringified formats:
+
+```typescript
+// Convert to stringified format (right before external transmission)
+const stringified = stringifySessionData(sessionData);
+
+// Convert back to structured format (after receiving from external source)
+const metadata = JSON.parse(stringified.metadata);
+const keystrokes = JSON.parse(stringified.keystrokes);
+const metrics = JSON.parse(stringified.metrics);
+```
+
+The stringified format is primarily used when transmitting data to external systems like Palantir Foundry, while the structured format is used for local calculations and display. 

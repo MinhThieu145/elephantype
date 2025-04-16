@@ -131,12 +131,14 @@ The system includes built-in integration with Palantir Foundry for advanced data
 1. **How It Works**:
    - Typing data is sent to Palantir Foundry through secure API calls
    - Data follows the schema defined in `DATA_POINTS_REFERENCE.md`
+   - Before transmission, data is converted to a stringified format
    - Preview mode allows validation without data ingestion
    - Full integration enables detailed analysis in the Foundry platform
 
 2. **Features**:
    - Preview validation to ensure data schema compliance
    - Secure authentication using API tokens
+   - Automatic conversion of complex objects to JSON strings for compatibility
    - Error handling and user feedback
    - Both UI integration and command-line testing tools
 
@@ -144,6 +146,14 @@ The system includes built-in integration with Palantir Foundry for advanced data
    - API token must be configured in environment variables
    - Integration settings can be modified in `sendDataToFoundry.ts`
    - Test scripts available for verifying connectivity
+   
+4. **Data Format**:
+   - Before sending to Foundry, the three main data categories are stringified:
+     - `metadata`: Converted to a JSON string
+     - `keystrokes`: Converted to a JSON string
+     - `metrics`: Converted to a JSON string
+   - This conversion happens just before transmission
+   - Original object structure is preserved for local use
 
 ### Other Integration Possibilities
 
