@@ -116,7 +116,8 @@ export function initializeSession(textPrompt: string): SessionMetadata {
     userTranscript: '',
     completionStatus: 'in-progress',
     duration: null,
-    deviceInfo: captureEnvironmentInfo()
+    deviceInfo: captureEnvironmentInfo(),
+    processingStatus: 'pending'
   };
 }
 
@@ -311,4 +312,21 @@ export function getSessionFromLocalStorage(sessionId: string): TypingSessionData
     console.error('Failed to retrieve session data from localStorage:', error);
     return null;
   }
+}
+
+/**
+ * Converts all main data categories to JSON strings
+ * @param sessionData TypingSessionData object
+ * @returns Object with metadata, keystrokes, and metrics as JSON strings
+ */
+export function stringifySessionData(sessionData: TypingSessionData): {
+  metadata: string;
+  keystrokes: string;
+  metrics: string;
+} {
+  return {
+    metadata: JSON.stringify(sessionData.metadata),
+    keystrokes: JSON.stringify(sessionData.keystrokes),
+    metrics: JSON.stringify(sessionData.metrics)
+  };
 } 
