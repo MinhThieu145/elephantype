@@ -5,6 +5,7 @@
  */
 
 import { TypingSessionData } from './types';
+import { stringifySessionData } from './dataCapture';
 
 // Our Next.js API route that will proxy requests to Foundry
 const API_ROUTE = '/api/foundry';
@@ -36,8 +37,11 @@ const getFoundryToken = (): string => {
  * @returns Formatted data object
  */
 export const formatDataForFoundry = (sessionData: TypingSessionData): Record<string, any> => {
-  // Return the session data wrapped in a records array as expected by Foundry API
-  return { records: [sessionData] };
+  // Convert the session data to stringified format before sending to Foundry
+  const stringifiedData = stringifySessionData(sessionData);
+  
+  // Return the stringified data wrapped in a records array as expected by Foundry API
+  return { records: [stringifiedData] };
 };
 
 /**
