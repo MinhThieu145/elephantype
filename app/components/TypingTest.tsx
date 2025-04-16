@@ -4,6 +4,16 @@ import { useState, useEffect, useRef } from 'react';
 import { useTypingData } from '../lib/useTypingData';
 import TypingStats from './TypingStats';
 
+// Sample inconsistent keys data - exactly as provided in your example
+const SAMPLE_INCONSISTENT_KEYS = {
+  "y": 156.26080762622468, 
+  "p": 155.00544345280264, 
+  "Backspace": 139.19051691835907, 
+  "g": 138.09127416314183, 
+  "l": 104.66454350288194, 
+  "t": 103.02275234141243
+};
+
 // Sample text prompts - in a real app, you might fetch these from an API
 const sampleTexts = [
   "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump!",
@@ -366,7 +376,13 @@ export default function TypingTest() {
       
       {/* Display typing statistics if session is complete */}
       {testComplete && sessionData && (
-        <TypingStats sessionData={sessionData} />
+        <TypingStats sessionData={{
+          ...sessionData,
+          metrics: {
+            ...sessionData.metrics,
+            inconsistentKeys: SAMPLE_INCONSISTENT_KEYS
+          }
+        }} />
       )}
     </div>
   );
