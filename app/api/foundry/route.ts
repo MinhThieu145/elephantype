@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TypingSessionData } from '../../lib/types';
 
-// Palantir Foundry API endpoint
-const FOUNDRY_API_ENDPOINT = 'https://nathannguyen.usw-16.palantirfoundry.com/api/v2/highScale/streams/datasets/ri.foundry.main.dataset.2c68d899-d736-4661-bc42-82acc742cc6e/streams/master/publishRecords';
+// Construct the Palantir Foundry API endpoint from environment variables
+const constructFoundryApiEndpoint = () => {
+  const foundryUrl = process.env.FOUNDRY_URL;
+  const typingDatasetUrl = process.env.FOUNDRY_API_TYPING_DATASET_URL;
+  
+  if (!foundryUrl || !typingDatasetUrl) {
+    throw new Error('Required environment variables FOUNDRY_URL or FOUNDRY_API_TYPING_DATASET_URL are missing');
+  }
+  
+  return `${foundryUrl}${typingDatasetUrl}`;
+};
 
 export async function POST(request: NextRequest) {
   console.log('API route called with preview:', new URL(request.url).searchParams.has('preview'));
@@ -27,28 +36,71 @@ export async function POST(request: NextRequest) {
     const requestData = await request.json();
     console.log('Received data structure:', Object.keys(requestData));
     
-    // Check if the data is already formatted with a records field
-    let sessionData: TypingSessionData;
-    let payload: { records: TypingSessionData[] };
+    // Always stringify the session data for Foundry
+    let sessionData: any; // Use any temporarily to handle various formats
+    let payload: { records: any[] };
     
     if (requestData.records) {
-      // Data is already in the correct format
-      payload = requestData;
+      // Data is already in the correct format, but ensure stringification
       sessionData = requestData.records[0];
     } else {
-      // Data needs to be wrapped in a records array
       sessionData = requestData;
-      payload = { records: [sessionData] };
     }
+
+    // Fix for metadata possibly being a string
+    if (sessionData.metadata && typeof sessionData.metadata === 'string') {
+      try {
+        // If metadata is a string, parse it first
+        const parsedMetadata = JSON.parse(sessionData.metadata);
+        // Set the userId on the parsed object
+        parsedMetadata.userId = process.env.DEFAULT_TEST_USER_ID || 'user-0d023529';
+        // Set the metadata back to a string
+        sessionData.metadata = JSON.stringify(parsedMetadata);
+      } catch (error) {
+        console.error('Error parsing metadata string:', error);
+        // If parsing fails, we'll leave it as is and it will be handled by stringifySessionData
+      }
+    } else if (sessionData.metadata && typeof sessionData.metadata === 'object') {
+      // If metadata is already an object, set userId directly
+      sessionData.metadata.userId = process.env.DEFAULT_TEST_USER_ID || 'user-0d023529';
+    } else {
+      console.error('Unexpected metadata format in sessionData:', typeof sessionData.metadata);
+    }
+
+    // Stringify the session data fields as required by Foundry
+    const { stringifySessionData } = await import('../../lib/dataCapture');
+    const stringifiedData = stringifySessionData(sessionData);
     
-    console.log('Using session data with ID:', sessionData.metadata?.sessionId);
+    // Use the stringified data directly, without additional JSON.stringify
+    payload = { 
+      records: [{
+        metadata: JSON.parse(stringifiedData.metadata),
+        keystrokes: JSON.parse(stringifiedData.keystrokes),
+        metrics: JSON.parse(stringifiedData.metrics)
+      }] 
+    };
+    
+    console.log('Using session data with ID:', 
+      typeof sessionData.metadata === 'string' 
+        ? JSON.parse(sessionData.metadata).sessionId 
+        : sessionData.metadata?.sessionId);
     
     // Get preview mode from the URL parameters
     const { searchParams } = new URL(request.url);
     const previewMode = searchParams.has('preview');
     
     // Build the API URL with preview parameter if needed
-    const apiUrl = `${FOUNDRY_API_ENDPOINT}${previewMode ? '?preview=true' : ''}`;
+    // Construct the API URL from environment variables
+    let apiUrl;
+    try {
+      apiUrl = `${constructFoundryApiEndpoint()}${previewMode ? '?preview=true' : ''}`;
+    } catch (error) {
+      console.error('Failed to construct Foundry API endpoint:', error);
+      return NextResponse.json(
+        { error: 'Missing environment configuration for Foundry API' },
+        { status: 500 }
+      );
+    }
     console.log('Sending request to:', apiUrl);
     
     console.log('Request payload structure:', Object.keys(payload));
