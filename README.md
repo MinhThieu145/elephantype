@@ -1,6 +1,7 @@
 # ElephantType
 
 A typing test app built with Next.js that tracks your typing speed and accuracy. Features Palantir Foundry integration for data storage and analysis.
+![Uploading image.png…]()
 
 ## Tech Stack
 
