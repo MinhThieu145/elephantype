@@ -10,7 +10,7 @@ export default function Header() {
     <header className="w-full py-4 px-6 flex justify-between items-center">
       <div className="flex items-center gap-2">
         <span className="text-2xl font-bold text-primary" style={{ color: 'var(--primary)' }}>
-          monkey<span className="text-foreground">type</span>
+          elephant<span className="text-foreground">type</span>
         </span>
       </div>
       

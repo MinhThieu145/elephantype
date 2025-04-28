@@ -3,16 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTypingData } from '../lib/useTypingData';
 import TypingStats from './TypingStats';
+import TypingFeedback from './TypingFeedback';
 
-// Sample inconsistent keys data - exactly as provided in your example
-const SAMPLE_INCONSISTENT_KEYS = {
-  "y": 156.26080762622468, 
-  "p": 155.00544345280264, 
-  "Backspace": 139.19051691835907, 
-  "g": 138.09127416314183, 
-  "l": 104.66454350288194, 
-  "t": 103.02275234141243
-};
+// Removed hardcoded sample data to use real data from Foundry
 
 // Sample text prompts - in a real app, you might fetch these from an API
 const sampleTexts = [
@@ -115,7 +108,25 @@ export default function TypingTest() {
     setTimeRemaining(0); // Ensure timer shows 0 when complete
     
     // Complete the session and capture final data
-    completeSession(userInput, status);
+    const finalSessionData = completeSession(userInput, status);
+    
+    // If the session was completed (not abandoned), automatically send to Foundry
+    if (status === 'completed' && finalSessionData) {
+      console.log('Auto-sending completed typing data to Foundry...');
+      // Use dynamic import to avoid issues with SSR
+      import('../lib/sendDataToFoundry').then(({ sendToFoundry }) => {
+        sendToFoundry(finalSessionData, false) // false means not preview mode - actually send the data
+          .then(response => {
+            console.log('Successfully sent data to Foundry:', response);
+            
+            // After successful data submission, high variance keystroke data will be available
+            // through the stats API endpoint that we've updated in this PR
+          })
+          .catch(error => {
+            console.error('Error sending data to Foundry:', error);
+          });
+      });
+    }
   };
 
   const calculateErrors = () => {
@@ -376,13 +387,13 @@ export default function TypingTest() {
       
       {/* Display typing statistics if session is complete */}
       {testComplete && sessionData && (
-        <TypingStats sessionData={{
-          ...sessionData,
-          metrics: {
-            ...sessionData.metrics,
-            inconsistentKeys: SAMPLE_INCONSISTENT_KEYS
-          }
-        }} />
+        <>
+          <TypingStats sessionData={sessionData} />
+          <TypingFeedback 
+            userId={process.env.NEXT_PUBLIC_DEFAULT_USER_ID || "user-0d023529"} 
+            sessionId={sessionData.metadata.sessionId} 
+          />
+        </>
       )}
     </div>
   );

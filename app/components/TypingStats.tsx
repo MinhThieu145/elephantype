@@ -4,21 +4,28 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import type { TypingSessionData } from '../lib/types';
 import FoundryIntegration from './FoundryIntegration';
 
+interface MetricDataPoint {
+  userId: string;
+  sessionId: string;
+  accuracy: number;
+  wpm: number;
+  endTime: string;
+  timestamp: number;
+  rawMetrics: any;
+}
+
 interface TypingStatsProps {
   sessionData: TypingSessionData | null;
 }
 
-// Define HighAvailabilityStats interface
-interface HighAvailabilityStats {
-  metrics: string;
-  metadata: string;
-  highStdKeysOutput: string;
-  keystrokesStat: string;
-  keystrokes: string;
-  __apiName: string;
-  __rid: string;
-  __primaryKey: string;
-  __title: string;
+interface HighVarianceKeystrokesData {
+  userId: string;
+  sessionId: string;
+  primaryKey: string;
+  inconsistentKeys: Record<string, number>;
+  // These fields aren't in the new API response but needed for compatibility
+  metadata?: string;
+  metrics?: string;
 }
 
 // Component to visualize inconsistent keys
@@ -161,487 +168,346 @@ function InconsistentKeysVisualization({ inconsistentKeys }: { inconsistentKeys:
   );
 }
 
-// Component to visualize performance (WPM & Accuracy) over time
-function PerformanceLineChart({ performanceData, latestSessionData }: { 
-  performanceData: Array<{metrics: string, metadata: string}>,
-  latestSessionData: HighAvailabilityStats
-}) {
+// Component to visualize performance metrics over time
+function PerformanceTimeseries({ metrics, currentSessionId }: { metrics: MetricDataPoint[], currentSessionId?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [includesCurrentSession, setIncludesCurrentSession] = useState(false);
   
+  // Check if metrics include current session
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas dimensions
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Process the data
-    const processedData = performanceData.map(item => {
-      const metrics = JSON.parse(item.metrics);
-      const metadata = JSON.parse(item.metadata);
-      return {
-        wpm: metrics.wpm,
-        accuracy: metrics.accuracy,
-        timestamp: metadata.endTime || metadata.startTime
-      };
-    }).sort((a, b) => a.timestamp - b.timestamp);
-    
-    // Add current session if not already included
-    const latestMetrics = JSON.parse(latestSessionData.metrics);
-    const latestMetadata = JSON.parse(latestSessionData.metadata);
-    const latestTimestamp = latestMetadata.endTime || latestMetadata.startTime;
-    
-    const isLatestIncluded = processedData.some(d => Math.abs(d.timestamp - latestTimestamp) < 1000);
-    
-    if (!isLatestIncluded) {
-      processedData.push({
-        wpm: latestMetrics.wpm,
-        accuracy: latestMetrics.accuracy,
-        timestamp: latestTimestamp
+    if (currentSessionId && metrics.length > 0) {
+      const hasCurrentSession = metrics.some(m => m.sessionId === currentSessionId);
+      setIncludesCurrentSession(hasCurrentSession);
+      if (hasCurrentSession) {
+        console.log('Performance chart includes current session:', currentSessionId);
+      }
+    }
+  }, [metrics, currentSessionId]);
+  
+  // Debug effect for metrics data received by component
+  useEffect(() => {
+    console.log('PerformanceTimeseries received metrics:', metrics);
+    if (metrics.length > 0) {
+      console.log('First metric in PerformanceTimeseries:', metrics[0]);
+      console.log('Types of first metric values:', {
+        accuracy: typeof metrics[0].accuracy,
+        wpm: typeof metrics[0].wpm,
+        timestamp: typeof metrics[0].timestamp
       });
     }
-    
-    // Make sure we have data to display
-    if (processedData.length === 0) return;
-    
-    // Special case for only one data point - duplicate it with a slightly different timestamp
-    // This allows us to draw a line even with just one real data point
-    if (processedData.length === 1) {
-      // Create a synthetic data point 1 day before the real one
-      const oneDay = 24 * 60 * 60 * 1000; // milliseconds in a day
-      const syntheticPoint = {
-        ...processedData[0],
-        timestamp: processedData[0].timestamp - oneDay
-      };
-      
-      // Add a note that this is placeholder data
-      ctx.fillStyle = 'var(--foreground)';
-      ctx.font = '14px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Only one session available', canvas.width / 2, 20);
-      
-      // Add the synthetic point at the beginning
-      processedData.unshift(syntheticPoint);
-    }
-    
-    // Calculate bounds
-    const padding = { top: 30, right: 20, bottom: 40, left: 40 };
-    const chartWidth = canvas.width - padding.left - padding.right;
-    const chartHeight = canvas.height - padding.top - padding.bottom;
-    
-    // Determine min/max values with safeguards for identical values
-    const wpmValues = processedData.map(d => d.wpm);
-    const maxWpm = Math.max(...wpmValues) * 1.1; // Add 10% for padding
-    const minWpm = Math.min(...wpmValues) > 0 ? Math.min(...wpmValues) * 0.9 : 0; // Subtract 10% for padding, floor at 0
-    
-    const accuracyValues = processedData.map(d => d.accuracy);
-    const maxAccuracy = Math.min(100, Math.max(...accuracyValues) * 1.05); // Add 5% for padding, cap at 100%
-    const minAccuracy = Math.max(0, Math.min(...accuracyValues) > 0 ? Math.min(...accuracyValues) * 0.95 : 0); // Subtract 5% for padding, floor at 0
-    
-    // Handle edge case of identical values
-    const wpmRange = maxWpm - minWpm;
-    const accuracyRange = maxAccuracy - minAccuracy;
-    
-    // If all values are identical, add a small range
-    const effectiveWpmRange = wpmRange < 0.001 ? maxWpm * 0.2 : wpmRange;
-    const effectiveAccuracyRange = accuracyRange < 0.001 ? maxAccuracy * 0.2 : accuracyRange;
-    
-    // Draw background
-    ctx.fillStyle = 'rgba(240, 240, 250, 0.05)';
-    ctx.fillRect(padding.left, padding.top, chartWidth, chartHeight);
-    
-    // Helper function to convert data point to coordinates
-    const dataToWpmCoord = (wpm: number, index: number) => {
-      const x = padding.left + (index / (processedData.length - 1)) * chartWidth;
-      const y = padding.top + chartHeight - ((wpm - minWpm) / effectiveWpmRange) * chartHeight;
-      return { x, y };
-    };
-    
-    const dataToAccuracyCoord = (accuracy: number, index: number) => {
-      const x = padding.left + (index / (processedData.length - 1)) * chartWidth;
-      const y = padding.top + chartHeight - ((accuracy - minAccuracy) / effectiveAccuracyRange) * chartHeight;
-      return { x, y };
-    };
-    
-    // Draw title
-    ctx.fillStyle = 'var(--foreground)';
-    ctx.font = 'bold 14px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Typing Performance Trends', canvas.width / 2, 20);
-    
-    // Draw grid
-    ctx.strokeStyle = 'rgba(200, 200, 200, 0.15)';
-    ctx.lineWidth = 1;
-    
-    // Vertical grid lines
-    const numVerticalLines = Math.min(processedData.length, 6);
-    for (let i = 0; i < numVerticalLines; i++) {
-      const x = padding.left + (chartWidth / (numVerticalLines - 1)) * i;
-      ctx.beginPath();
-      ctx.moveTo(x, padding.top);
-      ctx.lineTo(x, padding.top + chartHeight);
-      ctx.stroke();
-    }
-    
-    // Horizontal grid lines
-    const numHorizontalLines = 5;
-    for (let i = 0; i <= numHorizontalLines; i++) {
-      const y = padding.top + (chartHeight / numHorizontalLines) * i;
-      ctx.beginPath();
-      ctx.moveTo(padding.left, y);
-      ctx.lineTo(padding.left + chartWidth, y);
-      ctx.stroke();
-      
-      // WPM labels on y-axis
-      const wpmValue = maxWpm - (i / numHorizontalLines) * effectiveWpmRange;
-      ctx.fillStyle = 'rgba(150, 150, 150, 0.8)';
-      ctx.font = '10px system-ui, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(Math.round(wpmValue).toString() + ' wpm', padding.left - 5, y + 3);
-    }
-    
-    // Create WPM area gradient
-    const wpmGradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
-    wpmGradient.addColorStop(0, 'rgba(255, 20, 147, 0.3)'); // DeepPink with alpha
-    wpmGradient.addColorStop(1, 'rgba(255, 20, 147, 0.05)');
-    
-    // Create Accuracy area gradient
-    const accuracyGradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
-    accuracyGradient.addColorStop(0, 'rgba(70, 130, 180, 0.3)'); // SteelBlue with alpha
-    accuracyGradient.addColorStop(1, 'rgba(70, 130, 180, 0.05)');
-    
-    // Get control points for bezier curves
-    const getBezierControlPoints = (points: Array<{x: number, y: number}>) => {
-      if (points.length < 3) return null;
-      
-      const result = [];
-      
-      for (let i = 1; i < points.length - 1; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
-        const next = points[i + 1];
-        
-        // Calculate control points for smooth curve
-        const controlPoint1 = {
-          x: curr.x - (curr.x - prev.x) * 0.5,
-          y: curr.y - (curr.y - prev.y) * 0.5
-        };
-        
-        const controlPoint2 = {
-          x: curr.x + (next.x - curr.x) * 0.5,
-          y: curr.y + (next.y - curr.y) * 0.5
-        };
-        
-        result.push([controlPoint1, controlPoint2]);
+  }, [metrics]);
+  
+  useEffect(() => {
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas || metrics.length === 0) {
+        console.log('Canvas not available or no metrics data');
+        return;
       }
-      
-      return result;
-    };
-    
-    // Get points for WPM line
-    const wpmPoints = processedData.map((d, i) => dataToWpmCoord(d.wpm, i));
-    const wpmControlPoints = getBezierControlPoints(wpmPoints);
-    
-    // Get points for Accuracy line
-    const accuracyPoints = processedData.map((d, i) => dataToAccuracyCoord(d.accuracy, i));
-    const accuracyControlPoints = getBezierControlPoints(accuracyPoints);
-    
-    // Draw WPM area
-    ctx.beginPath();
-    ctx.moveTo(wpmPoints[0].x, padding.top + chartHeight); // Start at the bottom
-    ctx.lineTo(wpmPoints[0].x, wpmPoints[0].y); // Up to first point
-    
-    // Draw smooth curves for WPM area
-    if (wpmControlPoints && wpmPoints.length > 2) {
-      for (let i = 0; i < wpmPoints.length - 2; i++) {
-        const [c1, c2] = wpmControlPoints[i];
-        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, wpmPoints[i+1].x, wpmPoints[i+1].y);
-      }
-      // Last segment
-      ctx.lineTo(wpmPoints[wpmPoints.length-1].x, wpmPoints[wpmPoints.length-1].y);
-    } else {
-      // Fallback to straight lines
-      for (let i = 1; i < wpmPoints.length; i++) {
-        ctx.lineTo(wpmPoints[i].x, wpmPoints[i].y);
-      }
-    }
-    
-    // Complete the area
-    ctx.lineTo(wpmPoints[wpmPoints.length-1].x, padding.top + chartHeight);
-    ctx.closePath();
-    
-    // Fill the WPM area
-    ctx.fillStyle = wpmGradient;
-    ctx.fill();
-    
-    // Draw Accuracy area
-    ctx.beginPath();
-    ctx.moveTo(accuracyPoints[0].x, padding.top + chartHeight); // Start at the bottom
-    ctx.lineTo(accuracyPoints[0].x, accuracyPoints[0].y); // Up to first point
-    
-    // Draw smooth curves for Accuracy area
-    if (accuracyControlPoints && accuracyPoints.length > 2) {
-      for (let i = 0; i < accuracyPoints.length - 2; i++) {
-        const [c1, c2] = accuracyControlPoints[i];
-        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, accuracyPoints[i+1].x, accuracyPoints[i+1].y);
-      }
-      // Last segment
-      ctx.lineTo(accuracyPoints[accuracyPoints.length-1].x, accuracyPoints[accuracyPoints.length-1].y);
-    } else {
-      // Fallback to straight lines
-      for (let i = 1; i < accuracyPoints.length; i++) {
-        ctx.lineTo(accuracyPoints[i].x, accuracyPoints[i].y);
-      }
-    }
-    
-    // Complete the area
-    ctx.lineTo(accuracyPoints[accuracyPoints.length-1].x, padding.top + chartHeight);
-    ctx.closePath();
-    
-    // Fill the Accuracy area
-    ctx.fillStyle = accuracyGradient;
-    ctx.fill();
-    
-    // Draw WPM line
-    ctx.strokeStyle = 'rgba(255, 20, 147, 0.8)'; // DeepPink
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    
-    // Draw smooth curves for WPM line
-    ctx.moveTo(wpmPoints[0].x, wpmPoints[0].y);
-    
-    if (wpmControlPoints && wpmPoints.length > 2) {
-      for (let i = 0; i < wpmPoints.length - 2; i++) {
-        const [c1, c2] = wpmControlPoints[i];
-        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, wpmPoints[i+1].x, wpmPoints[i+1].y);
-      }
-      // Last segment
-      ctx.lineTo(wpmPoints[wpmPoints.length-1].x, wpmPoints[wpmPoints.length-1].y);
-    } else {
-      // Fallback to straight lines
-      for (let i = 1; i < wpmPoints.length; i++) {
-        ctx.lineTo(wpmPoints[i].x, wpmPoints[i].y);
-      }
-    }
-    
-    ctx.stroke();
-    
-    // Draw Accuracy line
-    ctx.strokeStyle = 'rgba(70, 130, 180, 0.8)'; // SteelBlue
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    
-    // Draw smooth curves for Accuracy line
-    ctx.moveTo(accuracyPoints[0].x, accuracyPoints[0].y);
-    
-    if (accuracyControlPoints && accuracyPoints.length > 2) {
-      for (let i = 0; i < accuracyPoints.length - 2; i++) {
-        const [c1, c2] = accuracyControlPoints[i];
-        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, accuracyPoints[i+1].x, accuracyPoints[i+1].y);
-      }
-      // Last segment
-      ctx.lineTo(accuracyPoints[accuracyPoints.length-1].x, accuracyPoints[accuracyPoints.length-1].y);
-    } else {
-      // Fallback to straight lines
-      for (let i = 1; i < accuracyPoints.length; i++) {
-        ctx.lineTo(accuracyPoints[i].x, accuracyPoints[i].y);
-      }
-    }
-    
-    ctx.stroke();
-    
-    // Draw WPM dots and labels
-    processedData.forEach((d, i) => {
-      // Skip the synthetic point if we only have one real data point
-      if (processedData.length === 2 && i === 0 && Math.abs(processedData[0].timestamp - processedData[1].timestamp) > 1000*60*60*24) return;
-      
-      const { x, y } = dataToWpmCoord(d.wpm, i);
-      
-      // Custom dot appearance
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, 6);
-      gradient.addColorStop(0, 'rgba(255, 20, 147, 1)');
-      gradient.addColorStop(1, 'rgba(255, 20, 147, 0.5)');
-      
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      // Add white outer ring
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.stroke();
-      
-      // Draw WPM value in small bubble above point
-      const wpmValue = Math.round(d.wpm);
-      const textWidth = ctx.measureText(wpmValue.toString()).width;
-      
-      // Draw bubble background
-      ctx.fillStyle = 'rgba(255, 20, 147, 0.7)';
-      const bubblePadding = 4;
-      const bubbleWidth = textWidth + bubblePadding * 2;
-      const bubbleHeight = 16;
-      const bubbleY = y - 22;
-      
-      ctx.beginPath();
-      ctx.roundRect(x - bubbleWidth/2, bubbleY, bubbleWidth, bubbleHeight, 4);
-      ctx.fill();
-      
-      // Draw text
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 10px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(wpmValue.toString(), x, bubbleY + 11);
-    });
-    
-    // Draw Accuracy dots and labels
-    processedData.forEach((d, i) => {
-      // Skip the synthetic point if we only have one real data point
-      if (processedData.length === 2 && i === 0 && Math.abs(processedData[0].timestamp - processedData[1].timestamp) > 1000*60*60*24) return;
-      
-      const { x, y } = dataToAccuracyCoord(d.accuracy, i);
-      
-      // Custom dot appearance
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, 6);
-      gradient.addColorStop(0, 'rgba(70, 130, 180, 1)');
-      gradient.addColorStop(1, 'rgba(70, 130, 180, 0.5)');
-      
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      // Add white outer ring
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(x, y, 5, 0, 2 * Math.PI);
-      ctx.stroke();
-      
-      // Draw Accuracy value in small bubble below point
-      const accuracyValue = Math.round(d.accuracy);
-      const textWidth = ctx.measureText(accuracyValue.toString() + '%').width;
-      
-      // Draw bubble background
-      ctx.fillStyle = 'rgba(70, 130, 180, 0.7)';
-      const bubblePadding = 4;
-      const bubbleWidth = textWidth + bubblePadding * 2;
-      const bubbleHeight = 16;
-      const bubbleY = y + 10;
-      
-      ctx.beginPath();
-      ctx.roundRect(x - bubbleWidth/2, bubbleY, bubbleWidth, bubbleHeight, 4);
-      ctx.fill();
-      
-      // Draw text
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 10px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(accuracyValue.toString() + '%', x, bubbleY + 11);
-    });
-    
-    // Draw legend
-    const legendX = padding.left;
-    const legendY = padding.top - 15;
-    
-    // WPM legend
-    const wpmGradientLegend = ctx.createLinearGradient(legendX, legendY, legendX + 15, legendY);
-    wpmGradientLegend.addColorStop(0, 'rgba(255, 20, 147, 1)');
-    wpmGradientLegend.addColorStop(1, 'rgba(255, 100, 170, 1)');
-    
-    ctx.fillStyle = wpmGradientLegend;
-    ctx.beginPath();
-    ctx.roundRect(legendX, legendY - 5, 15, 10, 3);
-    ctx.fill();
-    
-    ctx.fillStyle = 'var(--foreground)';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('WPM', legendX + 20, legendY + 2);
-    
-    // Accuracy legend
-    const accuracyGradientLegend = ctx.createLinearGradient(legendX + 80, legendY, legendX + 95, legendY);
-    accuracyGradientLegend.addColorStop(0, 'rgba(70, 130, 180, 1)');
-    accuracyGradientLegend.addColorStop(1, 'rgba(100, 160, 210, 1)');
-    
-    ctx.fillStyle = accuracyGradientLegend;
-    ctx.beginPath();
-    ctx.roundRect(legendX + 80, legendY - 5, 15, 10, 3);
-    ctx.fill();
-    
-    ctx.fillStyle = 'var(--foreground)';
-    ctx.fillText('Accuracy', legendX + 100, legendY + 2);
-    
-    // Draw time labels
-    // If we have multiple sessions, show real dates
-    if (processedData.length > 2 || (processedData.length === 2 && Math.abs(processedData[0].timestamp - processedData[1].timestamp) > 1000 * 60 * 60)) {
-      const formatDate = (timestamp: number) => {
-        const date = new Date(timestamp);
-        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + 
-               ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      };
-      
-      // Only show first and last timestamps if they're meaningful
-      // Skip the synthetic point if we only have one real data point
-      const startIdx = processedData.length === 2 && Math.abs(processedData[0].timestamp - processedData[1].timestamp) > 1000*60*60*24 ? 1 : 0;
-      const firstTimestamp = processedData[startIdx].timestamp;
-      const lastTimestamp = processedData[processedData.length - 1].timestamp;
-      
-      ctx.fillStyle = 'rgba(150, 150, 150, 0.8)';
-      ctx.font = '10px system-ui, sans-serif';
-      
-      // Only show both timestamps if they're different
-      if (Math.abs(firstTimestamp - lastTimestamp) > 1000 * 60) { // more than a minute apart
-        ctx.textAlign = 'left';
-        ctx.fillText(formatDate(firstTimestamp), padding.left, padding.top + chartHeight + 20);
-        
-        ctx.textAlign = 'right';
-        ctx.fillText(formatDate(lastTimestamp), padding.left + chartWidth, padding.top + chartHeight + 20);
-      } else {
-        // If only one real point or identical timestamps, show just the one
-        ctx.textAlign = 'center';
-        ctx.fillText(formatDate(lastTimestamp), padding.left + chartWidth/2, padding.top + chartHeight + 20);
-      }
-    }
-    
-  }, [performanceData, latestSessionData]);
 
-  // Calculate how many real, different sessions we have
-  const uniqueSessionCount = useMemo(() => {
-    const uniqueTimestamps = new Set();
-    
-    performanceData.forEach(item => {
-      const metadata = JSON.parse(item.metadata);
-      const timestamp = metadata.endTime || metadata.startTime;
-      uniqueTimestamps.add(Math.floor(timestamp / 1000)); // Round to the nearest second
-    });
-    
-    const latestMetadata = JSON.parse(latestSessionData.metadata);
-    const latestTimestamp = latestMetadata.endTime || latestMetadata.startTime;
-    uniqueTimestamps.add(Math.floor(latestTimestamp / 1000));
-    
-    return uniqueTimestamps.size;
-  }, [performanceData, latestSessionData]);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get canvas context');
+        return;
+      }
+
+      console.log('Drawing performance chart with metrics:', metrics.length);
+      
+      // Set canvas dimensions based on its display size
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Set up chart dimensions
+      const padding = { top: 30, right: 50, bottom: 40, left: 50 };
+      const chartWidth = canvas.width - padding.left - padding.right;
+      const chartHeight = canvas.height - padding.top - padding.bottom;
+      
+      // Find max values for scaling
+      const maxWpm = Math.max(...metrics.map(m => m.wpm)) * 1.1; // Add 10% headroom
+      const maxAccuracy = 100; // Accuracy is always 0-100%
+      
+      // Draw title
+      ctx.fillStyle = 'var(--foreground)';
+      ctx.font = 'bold 14px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Performance Over Time', canvas.width / 2, 20);
+
+      // Sort metrics by timestamp (ascending)
+      const sortedMetrics = [...metrics].sort((a, b) => a.timestamp - b.timestamp);
+      
+      // Calculate positions for x-axis - use session number instead of timestamp
+      const getXPosition = (index: number) => {
+        return padding.left + (index / (sortedMetrics.length - 1)) * chartWidth;
+      };
+      
+      // Format for x-axis label - use session number and relative time
+      const formatXLabel = (metric: MetricDataPoint, index: number) => {
+        // Get relative time (how long ago)
+        const now = Date.now();
+        const timestamp = metric.timestamp;
+        const diffMs = now - timestamp;
+        
+        // Convert to appropriate units
+        if (diffMs < 60000) { // Less than 1 minute
+          return `#${index + 1}\n(just now)`;
+        } else if (diffMs < 3600000) { // Less than 1 hour
+          const minutes = Math.floor(diffMs / 60000);
+          return `#${index + 1}\n(${minutes}m ago)`;
+        } else if (diffMs < 86400000) { // Less than 1 day
+          const hours = Math.floor(diffMs / 3600000);
+          return `#${index + 1}\n(${hours}h ago)`;
+        } else {
+          const days = Math.floor(diffMs / 86400000);
+          return `#${index + 1}\n(${days}d ago)`;
+        }
+      };
+      
+      // Draw x-axis (time)
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top + chartHeight);
+      ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+      ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Draw y-axis
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, padding.top + chartHeight);
+      ctx.stroke();
+      
+      // Draw x-axis labels (evenly spaced)
+      const numXLabels = Math.min(sortedMetrics.length, 5);
+      if (sortedMetrics.length > 1) {
+        for (let i = 0; i < numXLabels; i++) {
+          const position = i / (numXLabels - 1);
+          const index = Math.floor(position * (sortedMetrics.length - 1));
+          const x = getXPosition(index);
+          const metric = sortedMetrics[index];
+          
+          ctx.fillStyle = 'rgba(150, 150, 150, 0.8)';
+          ctx.font = '10px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          
+          // Split label into two lines
+          const label = formatXLabel(metric, index);
+          const lines = label.split('\n');
+          
+          // Draw first line (session number)
+          ctx.fillText(lines[0], x, padding.top + chartHeight + 15);
+          
+          // Draw second line (relative time)
+          if (lines.length > 1) {
+            ctx.fillText(lines[1], x, padding.top + chartHeight + 30);
+          }
+          
+          // Draw vertical grid line
+          ctx.beginPath();
+          ctx.moveTo(x, padding.top);
+          ctx.lineTo(x, padding.top + chartHeight);
+          ctx.strokeStyle = 'rgba(150, 150, 150, 0.1)';
+          ctx.stroke();
+        }
+      }
+      
+      // Draw y-axis labels and grid lines for WPM (left side)
+      const yWpmLabels = 5;
+      for (let i = 0; i <= yWpmLabels; i++) {
+        const value = (i / yWpmLabels) * maxWpm;
+        const y = padding.top + chartHeight - (i / yWpmLabels) * chartHeight;
+        
+        ctx.fillStyle = 'rgba(150, 150, 150, 0.8)';
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(Math.round(value).toString(), padding.left - 5, y + 3);
+        
+        // Draw horizontal grid line
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + chartWidth, y);
+        ctx.strokeStyle = 'rgba(150, 150, 150, 0.1)';
+        ctx.stroke();
+      }
+      
+      // Draw y-axis labels for Accuracy (right side)
+      for (let i = 0; i <= yWpmLabels; i++) {
+        const value = (i / yWpmLabels) * maxAccuracy;
+        const y = padding.top + chartHeight - (i / yWpmLabels) * chartHeight;
+        
+        ctx.fillStyle = 'rgba(150, 150, 150, 0.8)';
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(Math.round(value).toString() + '%', padding.left + chartWidth + 5, y + 3);
+      }
+      
+      // Draw WPM line
+      ctx.beginPath();
+      sortedMetrics.forEach((point, index) => {
+        const x = getXPosition(index);
+        const y = padding.top + chartHeight - (point.wpm / maxWpm) * chartHeight;
+        
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = 'rgba(255, 100, 100, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Add gradient under the WPM line
+      const wpmGradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
+      wpmGradient.addColorStop(0, 'rgba(255, 100, 100, 0.3)');
+      wpmGradient.addColorStop(1, 'rgba(255, 100, 100, 0.05)');
+      
+      ctx.beginPath();
+      sortedMetrics.forEach((point, index) => {
+        const x = getXPosition(index);
+        const y = padding.top + chartHeight - (point.wpm / maxWpm) * chartHeight;
+        
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      // Complete the gradient fill path
+      const lastX = getXPosition(sortedMetrics.length - 1);
+      ctx.lineTo(lastX, padding.top + chartHeight);
+      ctx.lineTo(padding.left, padding.top + chartHeight);
+      ctx.closePath();
+      ctx.fillStyle = wpmGradient;
+      ctx.fill();
+      
+      // Draw WPM data points
+      sortedMetrics.forEach((point, index) => {
+        const x = getXPosition(index);
+        const y = padding.top + chartHeight - (point.wpm / maxWpm) * chartHeight;
+        
+        // Check if this is the current session point
+        const isCurrentSession = point.sessionId === currentSessionId;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, isCurrentSession ? 6 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = isCurrentSession ? 'rgba(255, 50, 50, 1)' : 'rgba(255, 100, 100, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = isCurrentSession ? 'white' : 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = isCurrentSession ? 2 : 1;
+        ctx.stroke();
+        
+        // Add label for current session
+        if (isCurrentSession) {
+          ctx.fillStyle = 'rgba(255, 50, 50, 1)';
+          ctx.font = 'bold 10px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Latest', x, y - 12);
+        }
+      });
+      
+      // Draw Accuracy line
+      ctx.beginPath();
+      sortedMetrics.forEach((point, index) => {
+        const x = getXPosition(index);
+        const y = padding.top + chartHeight - (point.accuracy / maxAccuracy) * chartHeight;
+        
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = 'rgba(100, 180, 255, 0.9)';
+      ctx.stroke();
+      
+      // Draw Accuracy data points
+      sortedMetrics.forEach((point, index) => {
+        const x = getXPosition(index);
+        const y = padding.top + chartHeight - (point.accuracy / maxAccuracy) * chartHeight;
+        
+        // Check if this is the current session point
+        const isCurrentSession = point.sessionId === currentSessionId;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, isCurrentSession ? 6 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = isCurrentSession ? 'rgba(0, 120, 255, 1)' : 'rgba(100, 180, 255, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = isCurrentSession ? 2 : 1;
+        ctx.stroke();
+      });
+      
+      // Add legend
+      const legendY = padding.top + 15;
+      
+      // WPM legend item
+      ctx.beginPath();
+      ctx.rect(padding.left, legendY - 5, 15, 2);
+      ctx.fillStyle = 'rgba(255, 100, 100, 0.9)';
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.arc(padding.left + 8, legendY - 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = 'var(--foreground)';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('WPM', padding.left + 20, legendY);
+      
+      // Accuracy legend item
+      ctx.beginPath();
+      ctx.rect(padding.left + 70, legendY - 5, 15, 2);
+      ctx.fillStyle = 'rgba(100, 180, 255, 0.9)';
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.arc(padding.left + 78, legendY - 4, 3, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = 'var(--foreground)';
+      ctx.textAlign = 'left';
+      ctx.fillText('Accuracy', padding.left + 90, legendY);
+      
+    } catch (error) {
+      console.error('Error rendering performance chart:', error);
+    }
+  }, [metrics, currentSessionId]);
+
+  if (metrics.length === 0) {
+    console.log('PerformanceTimeseries: No metrics available');
+    return (
+      <div className="text-center py-6 text-sm opacity-70">
+        No performance data available yet.
+      </div>
+    );
+  }
+
+  // Debug the metrics data that should be rendered
+  console.log('PerformanceTimeseries rendering with valid metrics:', 
+    metrics.map((m: MetricDataPoint) => ({ 
+      wpm: m.wpm, 
+      accuracy: m.accuracy, 
+      timestamp: m.timestamp,
+      sessionId: m.sessionId?.substring(0, 8) + '...'
+    }))
+  );
 
   return (
     <>
       <canvas 
         ref={canvasRef} 
-        className="w-full h-[250px]"
+        className="w-full h-[250px]" 
       />
-      <div className="mt-2 text-xs text-center text-opacity-70">
-        {uniqueSessionCount > 1 
-          ? `Showing performance trends across ${uniqueSessionCount} sessions` 
-          : 'Only one session available - more data will be visible as you complete more typing sessions'}
+      <div className="mt-2 text-xs text-center opacity-70">
+        {includesCurrentSession ? (
+          <span>Showing performance trends across {metrics.length} typing sessions (including current session)</span>
+        ) : (
+          <span>Showing performance trends across {metrics.length} typing sessions (latest session still processing)</span>
+        )}
       </div>
     </>
   );
@@ -650,8 +516,8 @@ function PerformanceLineChart({ performanceData, latestSessionData }: {
 export default function TypingStats({ sessionData: initialSessionData }: TypingStatsProps) {
   const [activeTab, setActiveTab] = useState<'summary' | 'detailed' | 'raw'>('summary');
   const [showDemo, setShowDemo] = useState(false);
-  const [foundryStats, setFoundryStats] = useState<HighAvailabilityStats[] | null>(null);
-  const [matchedStats, setMatchedStats] = useState<HighAvailabilityStats | null>(null);
+  const [foundryKeystrokeData, setFoundryKeystrokeData] = useState<HighVarianceKeystrokesData[] | null>(null);
+  const [matchedKeystrokeData, setMatchedKeystrokeData] = useState<HighVarianceKeystrokesData | null>(null);
   const [realInconsistentKeys, setRealInconsistentKeys] = useState<Record<string, number> | null>(null);
   const [sessionData, setSessionData] = useState<TypingSessionData | null>(initialSessionData);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -663,196 +529,287 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
     isLoading: false,
     result: null
   });
-  const maxRetries = 3;
-  const retryInterval = 15000; // 15 seconds
+  const [metricsData, setMetricsData] = useState<MetricDataPoint[]>([]);
+  const [matchFound, setMatchFound] = useState<boolean>(false);
+  const [waitingForCurrentSession, setWaitingForCurrentSession] = useState<boolean>(false);
+  const maxRetries = 7;
+  const retryInterval = 30000;
   
-  // Auto validate/send data to Foundry when session data is available - only run once
+  // Add this useEffect to debug metrics data state at the beginning
   useEffect(() => {
-    if (!sessionData || showDemo || validationStatus.isLoading || validationStatus.result) return;
-    
-    // Import the function dynamically to avoid import issues
-    const validateAndSendData = async () => {
-      try {
-        setValidationStatus(prev => ({ ...prev, isLoading: true }));
-        console.log('Automatically validating and sending data to Foundry...');
-        
-        // Dynamically import the function
-        const { previewSendToFoundry } = await import('../lib/sendDataToFoundry');
-        const response = await previewSendToFoundry(sessionData);
-        
-        console.log('Auto-validation response:', response);
-        setValidationStatus({ isLoading: false, result: response });
-        
-        // If validation was successful, start fetching stats
-        if (response && !response.error) {
-          console.log('Validation successful, fetching Foundry stats...');
-          // Give a small delay to allow data to propagate
-          setTimeout(() => {
-            setRetryCount(0); // Trigger the fetch
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Error in auto-validation:', error);
-        setValidationStatus({ 
-          isLoading: false, 
-          result: { 
-            success: false, 
-            message: error instanceof Error ? error.message : 'Unknown error occurred',
-            error: error instanceof Error ? error.stack : String(error)
-          }
-        });
-      }
-    };
-    
-    // If we have real session data (not demo), auto-validate it
-    validateAndSendData();
-  }, [sessionData, showDemo, validationStatus.isLoading, validationStatus.result]);
+    console.log('======= DEBUG METRICS STATE =======');
+    console.log('metricsData:', metricsData);
+    console.log('metricsData.length:', metricsData.length);
+    console.log('showDemo:', showDemo);
+    console.log('isLoading:', isLoading);
+    console.log('foundryDataFetchComplete:', foundryDataFetchComplete);
+    console.log('==================================');
+  }, [metricsData, showDemo, isLoading, foundryDataFetchComplete]);
   
-  // Fetch Foundry stats
+  // Fetch Foundry high variance keystroke data AND metrics data within the same retry flow
   useEffect(() => {
     // Don't attempt to fetch if there's no session data
-    if (!sessionData) return;
+    if (!sessionData) {
+      console.log('Skipping fetch - no sessionData');
+      return;
+    }
+    
+    // Skip if we've already found a match
+    if (matchFound) {
+      console.log('Skipping fetch - match already found');
+      return;
+    }
+    
+    // This is key: we want to refetch even if foundryDataFetchComplete is true,
+    // if we're on a retry (retryCount > 0) - reset this flag to allow refetching
+    if (retryCount > 0 && foundryDataFetchComplete) {
+      console.log(`Retry ${retryCount}/${maxRetries} - resetting foundryDataFetchComplete to fetch fresh data`);
+      setFoundryDataFetchComplete(false);
+    }
+    
+    // Skip if we've already fetched and it's not a retry
+    if (foundryDataFetchComplete && retryCount === 0) {
+      console.log('Skipping fetch - foundryDataFetchComplete already true and not a retry');
+      return;
+    }
     
     let timeoutId: NodeJS.Timeout;
     let isMounted = true;
     
-    async function fetchFoundryStats() {
+    async function fetchFoundryData() {
       if (!isMounted) return;
       
       try {
-        setIsLoading(true);
-        setLoadingError(null);
-        setNoMatchFound(false);
-        setFoundryDataFetchComplete(false);
+        // Only set loading state on first fetch or explicit retries
+        if (!foundryDataFetchComplete || retryCount > 0) {
+          setIsLoading(true);
+          setLoadingError(null);
+          setNoMatchFound(false);
+        }
         
         console.log(`Foundry fetch attempt ${retryCount + 1}/${maxRetries}...`);
         
-        // This would be replaced with your actual API endpoint
-        const response = await fetch('/api/foundry/stats');
+        // STEP 1: First fetch high variance keystroke data
+        console.log('Starting fresh fetch of keystroke data...');
+        const keystrokeResponse = await fetch('/api/foundry/stats');
         
         if (!isMounted) return;
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch stats: ${response.status} ${response.statusText}`);
+        if (!keystrokeResponse.ok) {
+          throw new Error(`Failed to fetch high variance keystroke data: ${keystrokeResponse.status} ${keystrokeResponse.statusText}`);
         }
         
-        const data = await response.json();
+        const keystrokeData = await keystrokeResponse.json();
         
         if (!isMounted) return;
         
-        setFoundryStats(data);
+        console.log(`Keystroke data fetched: ${keystrokeData.length} items`);
+        setFoundryKeystrokeData(keystrokeData);
         
-        // Don't reset isLoading here - we need to try matching first
+        // STEP 2: Then fetch metrics data using the same user ID
+        // Determine the userId to use for metrics fetch
+        let userId = process.env.NEXT_PUBLIC_DEFAULT_USER_ID || 'user-0d023529'; // Use environment variable or fallback to default
+        
+        // Get the actual userId from session if available
+        if (sessionData && sessionData.metadata) {
+          // Handle the case where metadata might be a string instead of an object
+          const metadata = typeof sessionData.metadata === 'string' 
+            ? JSON.parse(sessionData.metadata) 
+            : sessionData.metadata;
+          
+          if (metadata.userId) {
+            // Override with session userId only if we want personalized metrics
+            // For now, use the fixed ID to ensure we have data to display
+            // userId = metadata.userId;
+            console.log('Session has userId:', metadata.userId, 'but using fixed ID for demo');
+          }
+        }
+        
+        console.log(`Fetching performance metrics for user: ${userId} (attempt ${retryCount + 1}/${maxRetries})`);
+        const metricsResponse = await fetch(`/api/foundry/metrics?userId=${userId}`);
+        
+        if (!isMounted) return;
+        
+        if (!metricsResponse.ok) {
+          throw new Error(`Failed to fetch metrics data: ${metricsResponse.status} ${metricsResponse.statusText}`);
+        }
+        
+        const metricsResult = await metricsResponse.json();
+        
+        if (!isMounted) return;
+        
+        console.log('Raw metrics result:', metricsResult);
+        
+        if (metricsResult.metrics && Array.isArray(metricsResult.metrics)) {
+          console.log(`Loaded ${metricsResult.metrics.length} metrics for user ${userId}`);
+          
+          // Use a temporary variable to help debug
+          const newMetricsData = metricsResult.metrics;
+          console.log('New metrics data (first item):', newMetricsData[0]);
+          console.log('New metrics data length:', newMetricsData.length);
+          
+          // Ensure metrics have correct types
+          const typedMetrics = newMetricsData.map((m: {
+            userId: string;
+            sessionId: string;
+            accuracy: number | string;
+            wpm: number | string;
+            endTime: string;
+            timestamp: number | string;
+            rawMetrics: any;
+          }) => ({
+            ...m,
+            accuracy: typeof m.accuracy === 'string' ? parseFloat(m.accuracy) : m.accuracy,
+            wpm: typeof m.wpm === 'string' ? parseFloat(m.wpm) : m.wpm,
+            timestamp: typeof m.timestamp === 'string' ? parseInt(m.timestamp) : m.timestamp
+          }));
+          
+          console.log('Setting metricsData with', typedMetrics.length, 'items');
+          setMetricsData(typedMetrics);
+          
+          console.log('Setting foundryDataFetchComplete to true');
+          setFoundryDataFetchComplete(true);
+          
+          // Only turn off loading if we're not trying to match keystroke data
+          if (!sessionData || !sessionData.metadata || !sessionData.metadata.sessionId) {
+            console.log('Setting isLoading to false (no session ID to match)');
+            setIsLoading(false);
+          } else {
+            console.log('Keeping isLoading true while attempting session match');
+          }
+        } else {
+          console.warn('No metrics data found or invalid format', metricsResult);
+          setMetricsData([]);
+          // Still set foundryDataFetchComplete to true to allow UI to proceed
+          setFoundryDataFetchComplete(true);
+          // If no metrics found, we can turn off loading if we're not matching keystroke data
+          if (!sessionData || !sessionData.metadata || !sessionData.metadata.sessionId) {
+            setIsLoading(false);
+          }
+        }
         
       } catch (error) {
         if (!isMounted) return;
         
-        console.error('Error fetching Foundry stats:', error);
+        console.error('Error fetching Foundry data:', error);
         
         if (retryCount < maxRetries - 1) {
-          setLoadingError(`Fetch attempt ${retryCount + 1}/${maxRetries} failed. Retrying in 15 seconds...`);
+          setLoadingError(`Fetch attempt ${retryCount + 1}/${maxRetries} failed. Retrying in 30 seconds...`);
           timeoutId = setTimeout(() => {
             if (isMounted) {
               setRetryCount(prev => prev + 1);
             }
           }, retryInterval);
         } else {
-          setLoadingError(`Failed to fetch stats after ${maxRetries} attempts. Please try again later.`);
+          setLoadingError(`Failed to fetch data after ${maxRetries} attempts. Please try again later.`);
           setIsLoading(false);
           setFoundryDataFetchComplete(true);
         }
       }
     }
     
-    fetchFoundryStats();
+    fetchFoundryData();
     
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [retryCount, sessionData]);
+  }, [retryCount, sessionData, foundryDataFetchComplete]);
 
-  // Match Foundry stats with current session
+  // Debug the metrics chart rendering condition
   useEffect(() => {
-    if (!sessionData || !foundryStats || !isLoading) return;
+    console.log('Metrics chart render check:', {
+      metricsDataLength: metricsData.length,
+      showDemo,
+      metricsDataLengthGTE2: metricsData.length >= 2,
+      willRenderChart: metricsData.length >= 2 && !showDemo
+    });
+  }, [metricsData.length, showDemo]);
+
+  // Match Foundry data with current session
+  useEffect(() => {
+    if (!sessionData || !foundryKeystrokeData || !isLoading) {
+      console.log('Match data useEffect - skipping with values:', { 
+        hasSessionData: !!sessionData, 
+        hasFoundryKeystrokeData: !!foundryKeystrokeData, 
+        isLoading
+      });
+      return;
+    }
+    
+    // Skip if we've already found a match
+    if (matchFound) {
+      console.log('Match check skipped - match already found');
+      return;
+    }
     
     try {
-      console.log('Attempting to match Foundry stats with current session...');
+      console.log('Attempting to match Foundry keystroke data with current session...');
       console.log('Local session ID:', sessionData.metadata.sessionId);
-      console.log('Local start time:', new Date(sessionData.metadata.startTime).toISOString());
-      console.log('Local end time:', sessionData.metadata.endTime ? new Date(sessionData.metadata.endTime).toISOString() : 'N/A');
       
-      const timeTolerance = 5000; // 5 seconds tolerance instead of 1
-      
-      // Find the matching stats based on sessionId, startTime, and endTime
-      const matched = foundryStats.find(stats => {
-        const metadataObj = JSON.parse(stats.metadata);
-        
-        // Log each potential match for debugging
-        console.log(`Checking Foundry stat with session ID: ${metadataObj.sessionId}`);
-        
-        const sessionIdMatch = metadataObj.sessionId === sessionData.metadata.sessionId;
-        const startTimeMatch = Math.abs(metadataObj.startTime - sessionData.metadata.startTime) < timeTolerance;
-        const endTimeMatch = !sessionData.metadata.endTime || 
-                             Math.abs(metadataObj.endTime - sessionData.metadata.endTime) < timeTolerance;
-        
-        console.log(`- Session ID match: ${sessionIdMatch}`);
-        console.log(`- Start time match: ${startTimeMatch} (diff: ${Math.abs(metadataObj.startTime - sessionData.metadata.startTime)}ms)`);
-        console.log(`- End time match: ${endTimeMatch}`);
-        
-        return sessionIdMatch && startTimeMatch && endTimeMatch;
-      });
+      // Find the matching keystroke data based on sessionId instead of userId
+      const matched = foundryKeystrokeData.find(data => 
+        data.sessionId === sessionData.metadata.sessionId
+      );
       
       if (matched) {
-        console.log('Found matching Foundry stat!');
-        setMatchedStats(matched);
+        console.log('Found matching Foundry keystroke data!');
+        setMatchedKeystrokeData(matched);
         setNoMatchFound(false);
+        setMatchFound(true); // Set flag to indicate we found a match
         
-        // Parse highStdKeysOutput and set as real inconsistent keys
-        if (matched.highStdKeysOutput) {
-          const keysOutput = JSON.parse(matched.highStdKeysOutput);
-          setRealInconsistentKeys(keysOutput);
+        // Set the inconsistent keys
+        if (matched.inconsistentKeys) {
+          setRealInconsistentKeys(matched.inconsistentKeys);
         }
         
-        // Found a match, so reset retry count and end loading
-        setRetryCount(0);
+        // Found a match, so end loading without resetting retry count
         setIsLoading(false);
         setFoundryDataFetchComplete(true);
+        
+        // Clear any pending timeouts by resetting retry count
+        setRetryCount(0);
       } else {
-        console.warn('No matching Foundry stat found. Available stats:', 
-          foundryStats.map(stat => {
-            const meta = JSON.parse(stat.metadata);
-            return {
-              sessionId: meta.sessionId,
-              startTime: new Date(meta.startTime).toISOString(),
-              endTime: meta.endTime ? new Date(meta.endTime).toISOString() : 'N/A'
-            };
-          })
+        console.warn('No matching Foundry keystroke data found. Available data:', 
+          foundryKeystrokeData.map(data => ({
+            sessionId: data.sessionId,
+            userId: data.userId,
+            primaryKey: data.primaryKey
+          }))
         );
         
         // If we've exhausted all retries, show the no match found message
         if (retryCount >= maxRetries - 1) {
+          console.log(`No match found after ${maxRetries} attempts. Giving up.`);
           setNoMatchFound(true);
           setIsLoading(false);
           setFoundryDataFetchComplete(true);
         } else {
           // Otherwise, continue retrying
-          console.log(`No match found. Will retry in 15 seconds (attempt ${retryCount + 1}/${maxRetries})...`);
+          console.log(`No match found. Will retry in ${retryInterval/1000} seconds (attempt ${retryCount + 1}/${maxRetries})...`);
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
           }, retryInterval);
         }
       }
+      
+      // At the end of this useEffect, check metricsData
+      console.log('Current metricsData state:', metricsData.length, 'items');
     } catch (error) {
-      console.error('Error matching Foundry stats:', error);
+      console.error('Error matching Foundry keystroke data:', error);
       
       // If an error occurs during matching and we've exhausted retries, stop loading
       if (retryCount >= maxRetries - 1) {
         setIsLoading(false);
         setFoundryDataFetchComplete(true);
+      } else {
+        // Otherwise retry
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+        }, retryInterval);
       }
     }
-  }, [foundryStats, sessionData, retryCount, maxRetries, isLoading]);
+  }, [foundryKeystrokeData, sessionData, retryCount, maxRetries, isLoading, retryInterval, metricsData]);
   
   // Create session data (either demo or with real inconsistent keys)
   useEffect(() => {
@@ -878,7 +835,9 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
               screenHeight: 1080,
               keyboardLayout: "QWERTY",
               inputMethod: "physical keyboard"
-            }
+            },
+            userId: "demo-user",
+            userName: "Demo User"
           },
           keystrokes: [], // Empty for demo
           metrics: {
@@ -977,10 +936,30 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
     );
   };
   
+  // Add a function to get a fallback for inconsistent keys
+  const getFallbackInconsistentKeys = () => {
+    // If we have foundry keystroke data, use the first record as a fallback
+    if (foundryKeystrokeData && foundryKeystrokeData.length > 0) {
+      console.log('Using fallback keystroke data from session:', foundryKeystrokeData[0].sessionId);
+      return foundryKeystrokeData[0].inconsistentKeys;
+    }
+    
+    // Otherwise return a demo fallback
+    return {
+      "e": 45.2,
+      "t": 38.7,
+      "a": 31.5,
+      "o": 29.8,
+      "i": 26.4,
+      "s": 24.3
+    };
+  };
+
   // Determine which inconsistent keys to show - priority order:
   // 1. Real Foundry data if we have it
   // 2. Local inconsistent keys from session data if in normal mode
-  // 3. Never show demo data
+  // 3. Fallback data if no match found but we have keystroke data from Foundry
+  // 4. Never show demo data (unless using fallback)
   const shouldShowInconsistentKeys = () => {
     if (showDemo) {
       return false; // Never show charts in demo mode
@@ -988,6 +967,8 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
       return true; // We have real Foundry data
     } else if (sessionData?.metrics?.inconsistentKeys && Object.keys(sessionData.metrics.inconsistentKeys).length > 0) {
       return true; // We have local inconsistent keys
+    } else if (foundryKeystrokeData && foundryKeystrokeData.length > 0 && noMatchFound && foundryDataFetchComplete) {
+      return true; // No match found, but we can use fallback data
     }
     return false;
   };
@@ -997,11 +978,216 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
       return realInconsistentKeys; // Highest priority: real data from Foundry
     } else if (sessionData?.metrics?.inconsistentKeys) {
       return sessionData.metrics.inconsistentKeys; // Second priority: local data
+    } else if (foundryKeystrokeData && foundryKeystrokeData.length > 0 && noMatchFound && foundryDataFetchComplete) {
+      return getFallbackInconsistentKeys(); // Third priority: fallback data
     }
     return null;
   };
   
   const inconsistentKeysToShow = getInconsistentKeysToShow();
+  
+  // Add debug useEffect for metrics rendering
+  useEffect(() => {
+    if (metricsData.length >= 2 && !showDemo) {
+      console.log('Rendering PerformanceTimeseries with', metricsData.length, 'metrics');
+    } else {
+      console.log('Not rendering chart. metricsData:', metricsData);
+    }
+  }, [metricsData, showDemo]);
+  
+  // Add debug function for directly checking currently available sessions
+  const debugCheckSessions = () => {
+    // Get all available sessions from foundryKeystrokeData
+    if (foundryKeystrokeData && foundryKeystrokeData.length > 0) {
+      const sessionIds = foundryKeystrokeData.map(data => data.sessionId);
+      console.log('Available session IDs:', sessionIds);
+      
+      // Check if current session ID is in the list
+      const isCurrentSessionAvailable = sessionIds.includes(sessionData?.metadata.sessionId || '');
+      console.log('Current session ID:', sessionData?.metadata.sessionId);
+      console.log('Is current session available?', isCurrentSessionAvailable);
+      
+      // Show alert with result
+      alert(`Debug: Found ${sessionIds.length} session IDs in Foundry data.
+Current session: ${sessionData?.metadata.sessionId}
+Is current session available? ${isCurrentSessionAvailable}
+Check console for full list.`);
+    } else {
+      alert('No foundry keystroke data available yet.');
+    }
+  };
+
+  // Add debug function to compare user IDs
+  const debugCheckUserIds = () => {
+    if (sessionData?.metadata) {
+      const sessionUserId = typeof sessionData.metadata === 'string' 
+        ? JSON.parse(sessionData.metadata).userId
+        : sessionData.metadata.userId;
+      
+      console.log('Session user ID:', sessionUserId);
+      console.log('Metrics API user ID:', 'user-0d023529');
+      
+      // Show alert with result
+      alert(`Debug: User ID comparison
+Current session user ID: ${sessionUserId}
+Metrics API user ID: user-0d023529`);
+    } else {
+      alert('No session data available.');
+    }
+  };
+  
+  // Add debug function to force API refresh
+  const debugForceRefresh = async () => {
+    try {
+      alert('Fetching fresh data from Foundry API...');
+      
+      // Reset states to allow a new fetch
+      setMatchFound(false);
+      setRetryCount(0);
+      setFoundryDataFetchComplete(false);
+      
+      // Fetch fresh data from API
+      const response = await fetch('/api/foundry/stats');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+      
+      const freshData = await response.json();
+      
+      if (Array.isArray(freshData)) {
+        // Log all available session IDs
+        const sessionIds = freshData.map(item => item.sessionId);
+        console.log('Fresh Foundry data - session IDs:', sessionIds);
+        
+        // Check if current session ID is in the list
+        const currentSessionId = sessionData?.metadata.sessionId;
+        const isCurrentSessionAvailable = sessionIds.includes(currentSessionId);
+        
+        console.log(`Current session ID: ${currentSessionId}`);
+        console.log(`Found in fresh data: ${isCurrentSessionAvailable}`);
+        
+        // Detailed check - look for similar IDs
+        const similarIds = sessionIds.filter(id => 
+          id && currentSessionId && 
+          (id.includes(currentSessionId.substring(0, 8)) || 
+           currentSessionId.includes(id.substring(0, 8))));
+        
+        // Update state with fresh data
+        setFoundryKeystrokeData(freshData);
+        
+        // If we found a match, update match state
+        if (isCurrentSessionAvailable) {
+          const matched = freshData.find(data => data.sessionId === currentSessionId);
+          if (matched) {
+            setMatchedKeystrokeData(matched);
+            setNoMatchFound(false);
+            setMatchFound(true);
+            
+            if (matched.inconsistentKeys) {
+              setRealInconsistentKeys(matched.inconsistentKeys);
+            }
+          }
+        }
+        
+        // Show result
+        alert(`Fresh data loaded from Foundry!
+Found ${freshData.length} records.
+Current session: ${currentSessionId}
+Found exact match: ${isCurrentSessionAvailable}
+Similar IDs found: ${similarIds.length > 0 ? 'Yes' : 'No'}
+
+Check console for details.`);
+      } else {
+        alert('Error: Unexpected data format from API');
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  
+  // Add a function to check if the current session is in metrics data
+  useEffect(() => {
+    if (sessionData && metricsData.length > 0 && foundryDataFetchComplete) {
+      const currentSessionId = sessionData.metadata.sessionId;
+      const sessionExists = metricsData.some(m => m.sessionId === currentSessionId);
+      
+      if (!sessionExists && !waitingForCurrentSession) {
+        console.log('Current session not found in metrics data, will try to update metrics');
+        setWaitingForCurrentSession(true);
+        
+        // Schedule a metrics refresh
+        const timeoutId = setTimeout(() => {
+          refreshMetricsData();
+        }, 10000); // Try after 10 seconds
+        
+        return () => clearTimeout(timeoutId);
+      } else if (sessionExists && waitingForCurrentSession) {
+        console.log('Current session now found in metrics data!');
+        setWaitingForCurrentSession(false);
+      }
+    }
+  }, [sessionData, metricsData, foundryDataFetchComplete]);
+  
+  // Add a function to refresh metrics data
+  const refreshMetricsData = async () => {
+    if (!sessionData) return;
+    
+    try {
+      // Determine the userId to use
+      let userId = 'user-0d023529'; // Default fixed user ID
+      
+      console.log('Refreshing metrics data...');
+      const metricsResponse = await fetch(`/api/foundry/metrics?userId=${userId}`);
+      
+      if (!metricsResponse.ok) {
+        throw new Error(`Failed to fetch metrics data: ${metricsResponse.status}`);
+      }
+      
+      const metricsResult = await metricsResponse.json();
+      
+      if (metricsResult.metrics && Array.isArray(metricsResult.metrics)) {
+        console.log(`Refreshed ${metricsResult.metrics.length} metrics for user ${userId}`);
+        
+        // Ensure metrics have correct types
+        const typedMetrics = metricsResult.metrics.map((m: {
+          userId: string;
+          sessionId: string;
+          accuracy: number | string;
+          wpm: number | string;
+          endTime: string;
+          timestamp: number | string;
+          rawMetrics: any;
+        }) => ({
+          ...m,
+          accuracy: typeof m.accuracy === 'string' ? parseFloat(m.accuracy) : m.accuracy,
+          wpm: typeof m.wpm === 'string' ? parseFloat(m.wpm) : m.wpm,
+          timestamp: typeof m.timestamp === 'string' ? parseInt(m.timestamp) : m.timestamp
+        }));
+        
+        setMetricsData(typedMetrics);
+        
+        // Check if current session is now in the data
+        const currentSessionId = sessionData.metadata.sessionId;
+        const sessionExists = typedMetrics.some(m => m.sessionId === currentSessionId);
+        
+        if (sessionExists) {
+          console.log('Current session found in refreshed metrics data!');
+          setWaitingForCurrentSession(false);
+        } else if (waitingForCurrentSession) {
+          console.log('Current session still not in metrics data, will try again later');
+          
+          // Schedule another refresh attempt if still waiting
+          setTimeout(() => {
+            refreshMetricsData();
+          }, 15000); // Try again after 15 seconds
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing metrics data:', error);
+    }
+  };
   
   return (
     <div 
@@ -1015,9 +1201,11 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
       {showDemo && (
         <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
           <p className="text-sm font-medium">🔍 Demo Mode: Showing visualization with sample inconsistent keys data:</p>
+          {/* Commenting out the demo inconsistent keys reference that's not defined
           <pre className="mt-2 text-xs overflow-x-auto">
             {JSON.stringify(DEMO_INCONSISTENT_KEYS, null, 2)}
           </pre>
+          */}
           <button 
             onClick={() => setShowDemo(false)}
             className="mt-2 px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
@@ -1054,64 +1242,12 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
       )}
       
       {/* Only show foundry match success banner when not in demo mode AND we have a match */}
-      {!showDemo && matchedStats && sessionData && (
+      {!showDemo && matchedKeystrokeData && sessionData && (
         <div className="mb-4 p-3 bg-green-100 dark:bg-green-900 rounded-lg">
           <p className="text-sm font-medium">✅ Using real data from Palantir Foundry for this session</p>
           <div className="mt-2 text-xs">
-            {(() => {
-              // Parse metadata from matchedStats to display actual matched values
-              const foundryMetadata = JSON.parse(matchedStats.metadata);
-              
-              // Calculate time differences
-              const startTimeDiff = Math.abs(foundryMetadata.startTime - sessionData.metadata.startTime);
-              const endTimeDiff = sessionData.metadata.endTime && foundryMetadata.endTime ? 
-                Math.abs(foundryMetadata.endTime - sessionData.metadata.endTime) : null;
-              
-              // Check if there are significant differences
-              const hasTimeDifferences = startTimeDiff > 500 || (endTimeDiff !== null && endTimeDiff > 500);
-              
-              return (
-                <>
-                  <div className="grid grid-cols-3 gap-y-1 mt-1">
-                    <div className="font-medium">Field</div>
-                    <div className="font-medium">Local Value</div>
-                    <div className="font-medium">Matched Foundry Value</div>
-                    
-                    <div>Session ID:</div>
-                    <div className="truncate">{sessionData.metadata.sessionId}</div>
-                    <div className="truncate">{foundryMetadata.sessionId}</div>
-                    
-                    <div>Start Time:</div>
-                    <div className={startTimeDiff > 500 ? "text-yellow-600 dark:text-yellow-400" : ""}>
-                      {formatTime(sessionData.metadata.startTime)}
-                    </div>
-                    <div className={startTimeDiff > 500 ? "text-yellow-600 dark:text-yellow-400" : ""}>
-                      {formatTime(foundryMetadata.startTime)}
-                    </div>
-                    
-                    <div>End Time:</div>
-                    <div className={endTimeDiff && endTimeDiff > 500 ? "text-yellow-600 dark:text-yellow-400" : ""}>
-                      {sessionData.metadata.endTime ? formatTime(sessionData.metadata.endTime) : 'N/A'}
-                    </div>
-                    <div className={endTimeDiff && endTimeDiff > 500 ? "text-yellow-600 dark:text-yellow-400" : ""}>
-                      {foundryMetadata.endTime ? formatTime(foundryMetadata.endTime) : 'N/A'}
-                    </div>
-                  </div>
-                  
-                  {hasTimeDifferences && (
-                    <div className="mt-2 text-yellow-600 dark:text-yellow-400 text-xs">
-                      <p>⚠️ Note: Some timestamps differ between local and Foundry data:</p>
-                      {startTimeDiff > 500 && (
-                        <p>- Start time difference: {(startTimeDiff / 1000).toFixed(2)} seconds</p>
-                      )}
-                      {endTimeDiff !== null && endTimeDiff > 500 && (
-                        <p>- End time difference: {(endTimeDiff / 1000).toFixed(2)} seconds</p>
-                      )}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+            <div>Session ID: <span className="font-mono">{matchedKeystrokeData.sessionId || 'N/A'}</span></div>
+            <div>User ID: <span className="font-mono">{matchedKeystrokeData.userId || 'N/A'}</span></div>
           </div>
         </div>
       )}
@@ -1178,6 +1314,11 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
               <h3 className="text-lg font-medium mb-2">Inconsistent Typing Keys</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 Keys with high variation in typing speed. Lower your delay variation for more consistent typing.
+                {foundryKeystrokeData && foundryKeystrokeData.length > 0 && noMatchFound && foundryDataFetchComplete && (
+                  <span className="block mt-1 text-yellow-600 dark:text-yellow-400 italic">
+                    Note: Showing sample data while your session processes. Check back in a few minutes for your actual data.
+                  </span>
+                )}
               </p>
               <div className="relative overflow-hidden rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)' }}>
                 <InconsistentKeysVisualization inconsistentKeys={inconsistentKeysToShow} />
@@ -1185,18 +1326,96 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
             </div>
           )}
           
-          {/* Performance Line Chart */}
-          {matchedStats && foundryStats && foundryStats.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-medium mb-2">Performance Over Time</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Track your typing speed (WPM) and accuracy progress over multiple sessions.
-              </p>
-              <div className="relative overflow-hidden rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)' }}>
-                <PerformanceLineChart performanceData={foundryStats} latestSessionData={matchedStats} />
-              </div>
+          {/* Performance Timeseries Chart - new section */}
+          <div className="mt-6">
+            <h3 className="text-lg font-medium mb-2">Performance Over Time</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Track your typing speed (WPM) and accuracy progression across sessions.
+            </p>
+            
+            {/* Wrap this section in a div with debugging */}
+            <div className="relative" onClick={() => console.log('Performance section clicked - current metricsData:', metricsData)}>
+              {isLoading && !metricsData.length ? (
+                <div className="flex justify-center items-center h-[250px]" style={{ backgroundColor: 'var(--secondary)' }}>
+                  <div className="flex flex-col items-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mb-2"></div>
+                    <p className="text-sm opacity-70">Loading metrics data... (attempt {retryCount + 1}/{maxRetries})</p>
+                    {loadingError && <p className="mt-2 text-sm text-center">{loadingError}</p>}
+                  </div>
+                </div>
+              ) : loadingError && !metricsData.length ? (
+                <div className="bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 p-4 rounded-lg">
+                  <p className="text-sm">{loadingError}</p>
+                  <button 
+                    onClick={() => { setRetryCount(0); }}
+                    className="mt-2 px-3 py-1 text-xs bg-red-200 dark:bg-red-800 rounded"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : metricsData.length >= 2 && !showDemo ? (
+                <div className="relative overflow-hidden rounded-lg p-4" style={{ backgroundColor: 'var(--secondary)' }}>
+                  {waitingForCurrentSession && (
+                    <div className="absolute top-2 right-2 text-xs text-yellow-500 dark:text-yellow-400 flex items-center">
+                      <span className="animate-pulse mr-1">●</span>
+                      Waiting for latest data...
+                    </div>
+                  )}
+                  <PerformanceTimeseries 
+                    metrics={metricsData}
+                    currentSessionId={sessionData?.metadata.sessionId}
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm opacity-70">
+                    {metricsData.length === 0 
+                      ? "No performance history available yet. Using demo user ID (user-0d023529) for this demo version." 
+                      : metricsData.length === 1
+                        ? "Need more typing tests to show performance trends (at least 2 required)." 
+                        : "Waiting for data to finish loading..."}
+                  </p>
+                  <div className="mt-2 text-xs">Debug: {metricsData.length} metrics available</div>
+                  
+                  {/* Debug button to inspect metricsData */}
+                  <button
+                    onClick={() => {
+                      console.log('Current metricsData:', metricsData);
+                      if (metricsData.length > 0) {
+                        console.log('First metric:', metricsData[0]);
+                        console.log('metrics types:', {
+                          accuracy: typeof metricsData[0].accuracy,
+                          wpm: typeof metricsData[0].wpm,
+                          timestamp: typeof metricsData[0].timestamp
+                        });
+                      }
+                      alert(`Debug: Found ${metricsData.length} metrics. Check console for details.`);
+                    }}
+                    className="mt-2 px-3 py-1 text-xs rounded-md bg-gray-300 dark:bg-gray-700"
+                  >
+                    Debug: Check Metrics
+                  </button>
+                  
+                  {!isLoading && retryCount >= maxRetries - 1 && (
+                    <button 
+                      onClick={() => { 
+                        setRetryCount(0);
+                        setMatchFound(false);
+                        setFoundryDataFetchComplete(false);
+                      }}
+                      className="mt-3 px-3 py-1 text-xs rounded-md"
+                      style={{ 
+                        backgroundColor: 'var(--primary)',
+                        color: 'var(--background)'
+                      }}
+                    >
+                      Reload Foundry Data
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
       
@@ -1299,14 +1518,14 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
             <pre>{JSON.stringify(sessionData, null, 2)}</pre>
           </div>
           
-          {matchedStats && (
+          {matchedKeystrokeData && (
             <>
-              <p className="mt-4 mb-2 text-sm">Foundry HighAvailabilityStats data:</p>
+              <p className="mt-4 mb-2 text-sm">Foundry HighVarianceKeystrokesData data:</p>
               <div 
                 className="font-mono text-xs p-4 rounded overflow-auto max-h-96"
                 style={{ backgroundColor: 'var(--input-bg)' }}
               >
-                <pre>{JSON.stringify(matchedStats, null, 2)}</pre>
+                <pre>{JSON.stringify(matchedKeystrokeData, null, 2)}</pre>
               </div>
             </>
           )}
@@ -1325,8 +1544,8 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
                     // Optional: Show feedback that it was copied
                     alert('JSON copied to clipboard!');
                   })
-                  .catch(err => {
-                    console.error('Failed to copy JSON:', err);
+                  .catch((error: Error) => {
+                    console.error('Failed to copy JSON:', error);
                     alert('Failed to copy. Please try again.');
                   });
               }}
@@ -1355,6 +1574,46 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
               Download JSON
             </button>
           </div>
+          
+          {/* Display Foundry Data */}
+          {!showDemo && (
+            <div>
+              <h3 className="text-lg font-medium mb-2">Foundry Integration</h3>
+              
+              {isLoading && (
+                <div className="flex items-center mb-4 p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                  <div className="animate-spin mr-2 h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                  <p className="text-sm font-medium">
+                    {loadingError ? loadingError : 'Fetching high variance keystroke data from Palantir Foundry...'}
+                  </p>
+                </div>
+              )}
+              
+              {/* Foundry Data Match Banner */}
+              {!showDemo && matchedKeystrokeData && sessionData && (
+                <div className="mb-4 p-3 bg-green-100 dark:bg-green-900 rounded-lg">
+                  <p className="text-sm font-medium">✅ Using real data from Palantir Foundry for this session</p>
+                  <div className="mt-2 text-xs">
+                    <div>Session ID: <span className="font-mono">{matchedKeystrokeData.sessionId || 'N/A'}</span></div>
+                    <div>User ID: <span className="font-mono">{matchedKeystrokeData.userId || 'N/A'}</span></div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Raw Foundry Data Display */}
+              {matchedKeystrokeData && (
+                <>
+                  <p className="mt-4 mb-2 text-sm">Foundry HighVarianceKeystrokesData data:</p>
+                  <div 
+                    className="font-mono text-xs p-4 rounded overflow-auto max-h-96"
+                    style={{ backgroundColor: 'var(--input-bg)' }}
+                  >
+                    <pre>{JSON.stringify(matchedKeystrokeData, null, 2)}</pre>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           
           {/* Palantir Foundry Integration */}
           <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -1393,23 +1652,32 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
       )}
       
       {/* No match found alert - only shown after all retries are exhausted */}
-      {!isLoading && !loadingError && noMatchFound && foundryDataFetchComplete && foundryStats && foundryStats.length > 0 && (
+      {!isLoading && !loadingError && noMatchFound && foundryDataFetchComplete && foundryKeystrokeData && foundryKeystrokeData.length > 0 && (
         <div className="my-4 p-3 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
           <div className="flex items-start">
             <svg className="h-5 w-5 mt-0.5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div>
-              <p className="font-medium">No matching Foundry data found for this session</p>
-              <p className="mt-1 text-sm">Your local session data doesn't match any records in Foundry. This could happen if:</p>
+              <p className="font-medium">Session data is processing</p>
+              <p className="mt-1 text-sm">Your typing data has been sent to Foundry, but may still be processing. We'll show your data when it's available.</p>
               <ul className="mt-1 text-sm list-disc list-inside pl-2">
-                <li>Your session data hasn't been sent to Foundry yet</li>
-                <li>The session ID or timestamps don't match</li>
-                <li>There's a synchronization delay with Foundry</li>
+                <li>Foundry typically takes 2-5 minutes to process session data</li>
+                <li>We've tried checking for your data {maxRetries} times (total wait: {(maxRetries*retryInterval/1000/60).toFixed(1)} minutes)</li>
+                {retryCount < maxRetries && (
+                  <li className="text-blue-700 dark:text-blue-300">
+                    Next retry in {Math.floor(retryInterval/1000)} seconds (attempt {retryCount + 1}/{maxRetries})
+                  </li>
+                )}
+                <li>You can try refreshing the page or use the debug tools below</li>
               </ul>
               <div className="mt-3 flex space-x-3">
                 <button 
-                  onClick={() => { setRetryCount(0); }}
+                  onClick={() => { 
+                    setRetryCount(0);
+                    setMatchFound(false);
+                    setFoundryDataFetchComplete(false);
+                  }}
                   className="px-3 py-1 text-sm font-medium rounded-md"
                   style={{ 
                     backgroundColor: 'var(--primary)',
@@ -1429,9 +1697,42 @@ export default function TypingStats({ sessionData: initialSessionData }: TypingS
                   View Session Details
                 </button>
               </div>
+              
+              {/* Debug buttons */}
+              <div className="mt-2 flex space-x-3">
+                <button 
+                  onClick={debugCheckSessions}
+                  className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded"
+                >
+                  Debug: Check Sessions
+                </button>
+                <button 
+                  onClick={debugCheckUserIds}
+                  className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded"
+                >
+                  Debug: Check User IDs
+                </button>
+                <button 
+                  onClick={debugForceRefresh}
+                  className="px-3 py-1 text-xs bg-red-200 dark:bg-red-700 rounded"
+                >
+                  Debug: Force API Refresh
+                </button>
+              </div>
+              
               <div className="mt-2 text-xs">
                 <p>Your Session ID: <span className="font-mono">{sessionData?.metadata.sessionId}</span></p>
-                <p>Found {foundryStats.length} non-matching records in Foundry</p>
+                <p>Found {foundryKeystrokeData.length} non-matching records in Foundry</p>
+                <details>
+                  <summary>All Session IDs (click to expand)</summary>
+                  <div className="mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
+                    {foundryKeystrokeData.map((data, i) => (
+                      <div key={i} className={data.sessionId === sessionData?.metadata.sessionId ? 'text-green-600 dark:text-green-400 font-bold' : ''}>
+                        {i+1}. {data.sessionId}
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             </div>
           </div>
