@@ -10,15 +10,20 @@
     "test:foundry": "ts-node scripts/testFoundryIntegration.ts",
     "test:foundry:osdk2": "ts-node scripts/testFoundryOSDK2.ts",
     "test:foundry:highavailabilitystats": "ts-node scripts/testFoundryHighAvailabilityStats.ts",
-    "fetch:highavailabilitystats": "ts-node scripts/fetchHighAvailabilityStats.ts"
+    "fetch:highavailabilitystats": "ts-node scripts/fetchHighAvailabilityStats.ts",
+    "test:metrics": "ts-node scripts/testMetricsAPI.ts"
   },
   "dependencies": {
     "@monkeytype/sdk": "file:@monkeytype_sdk-0.1.0.tgz",
     "@osdk/client": "^2.1.3",
     "@osdk/oauth": "1.1.1",
+    "@tailwindcss/typography": "^0.5.16",
     "next": "15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-emoji": "^5.0.1",
+    "remark-gfm": "^4.0.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
