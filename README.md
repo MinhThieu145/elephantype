@@ -77,7 +77,7 @@ The app uses two primary API patterns:
 
 - **SDK-Based Approach**: Leverages the Foundry JavaScript SDK for type-safe data access
 - **Direct REST Calls**: Fallback method using custom POST requests to:
-  ```
+```
   /api/v2/ontologies/{ONTOLOGY_ID}/objectSets/loadObjects
 ```
 
