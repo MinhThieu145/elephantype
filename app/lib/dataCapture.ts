@@ -117,7 +117,8 @@ export function initializeSession(textPrompt: string): SessionMetadata {
     completionStatus: 'in-progress',
     duration: null,
     deviceInfo: captureEnvironmentInfo(),
-    processingStatus: 'pending'
+    userId: 'user-' + uuidv4().substr(0, 8),  // Placeholder user ID
+    userName: 'Default User'                  // Placeholder user name
   };
 }
 

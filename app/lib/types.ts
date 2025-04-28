@@ -45,6 +45,8 @@ export interface SessionMetadata {
   completionStatus: 'completed' | 'abandoned' | 'in-progress'; // Status of the session
   duration: number | null;    // Total duration in milliseconds (null if not completed)
   deviceInfo: TypingEnvironment; // Environmental context
+  userId: string;             // User identifier (placeholder for authentication)
+  userName: string;           // User name (placeholder for authentication)
   processingStatus?: 'pending' | 'processing' | 'processed' | 'failed'; // Status of data processing for Palantir Foundry
   lastProcessedTimestamp?: number; // When the data was last processed
 }
