@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MonkeyType | Typing Test",
+  title: "ElephantType | Typing Test",
   description: "A minimalistic, distraction-free typing test app",
 };
 

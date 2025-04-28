@@ -8,7 +8,7 @@ export default function Home() {
       <Header />
       
       <main className="flex-1 py-8 px-4 flex flex-col items-center justify-center">
-        <h1 className="sr-only">MonkeyType - Typing Test</h1>
+        <h1 className="sr-only">ElephantType - Typing Test</h1>
         <TypingTest />
       </main>
       
