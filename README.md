@@ -2,7 +2,7 @@
 
 A typing test app built with Next.js that tracks your typing speed and accuracy. Features Palantir Foundry integration for data storage and analysis.
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/YOUTUBE_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=KZmsvFQx5mY)
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/KZmsvFQx5mY/0.jpg)](https://www.youtube.com/watch?v=KZmsvFQx5mY)
 
 
 
